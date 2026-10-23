@@ -17,8 +17,11 @@ defmodule QaAppWeb.SuperAdminLive.Index do
      |> assign(:users, users)
      |> assign(:room_admins, room_admins)
      |> assign(:room_form, room_form)
+     |> assign(:editing_room, nil)
+     |> assign(:edit_room_form, nil)
      |> assign(:show_create_room_modal?, false)
      |> assign(:show_create_admin_modal?, false)
+     |> assign(:show_configure_room_modal?, false)
      |> assign(:admin_username, "")
      |> assign(:admin_password, "")}
   end
@@ -31,6 +34,25 @@ defmodule QaAppWeb.SuperAdminLive.Index do
     {:noreply, assign(socket, :show_create_room_modal?, false)}
   end
 
+  def handle_event("open_configure_room", %{"id" => id}, socket) do
+    room = Events.get_room!(id)
+    edit_form = to_form(Events.change_room(room))
+
+    {:noreply,
+     socket
+     |> assign(:editing_room, room)
+     |> assign(:edit_room_form, edit_form)
+     |> assign(:show_configure_room_modal?, true)}
+  end
+
+  def handle_event("close_configure_room", _, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_configure_room_modal?, false)
+     |> assign(:editing_room, nil)
+     |> assign(:edit_room_form, nil)}
+  end
+
   def handle_event("open_create_admin", _, socket) do
     {:noreply, assign(socket, :show_create_admin_modal?, true)}
   end
@@ -40,6 +62,9 @@ defmodule QaAppWeb.SuperAdminLive.Index do
   end
 
   def handle_event("create_room", %{"room" => room_params}, socket) do
+    room_params =
+      if room_params["admin_id"] == "", do: Map.delete(room_params, "admin_id"), else: room_params
+
     case Events.create_room(room_params) do
       {:ok, _room} ->
         rooms = Events.list_rooms()
@@ -53,6 +78,31 @@ defmodule QaAppWeb.SuperAdminLive.Index do
 
       {:error, changeset} ->
         {:noreply, assign(socket, :room_form, to_form(changeset))}
+    end
+  end
+
+  def handle_event("update_room", %{"room" => room_params}, socket) do
+    room = socket.assigns.editing_room
+
+    room_params =
+      if room_params["admin_id"] == "",
+        do: Map.put(room_params, "admin_id", nil),
+        else: room_params
+
+    case Events.update_room(room, room_params) do
+      {:ok, _updated_room} ->
+        rooms = Events.list_rooms()
+
+        {:noreply,
+         socket
+         |> assign(:rooms, rooms)
+         |> assign(:show_configure_room_modal?, false)
+         |> assign(:editing_room, nil)
+         |> assign(:edit_room_form, nil)
+         |> put_flash(:info, "Room configured successfully.")}
+
+      {:error, changeset} ->
+        {:noreply, assign(socket, :edit_room_form, to_form(changeset))}
     end
   end
 
@@ -151,6 +201,13 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                     </td>
                     <td class="px-6 py-4 font-semibold text-slate-300">{room.word_limit} words</td>
                     <td class="px-6 py-4 text-right space-x-2">
+                      <button
+                        phx-click="open_configure_room"
+                        phx-value-id={room.id}
+                        class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600/30 text-amber-300 hover:bg-amber-600/40 border border-amber-500/30"
+                      >
+                        Configure
+                      </button>
                       <.link
                         navigate={~p"/admin/r/#{room.slug}"}
                         class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/40 border border-indigo-500/30"
@@ -172,6 +229,99 @@ defmodule QaAppWeb.SuperAdminLive.Index do
             </table>
           </div>
         </div>
+
+        <!-- Configure Room Modal -->
+        <%= if @show_configure_room_modal? do %>
+          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <div class="bg-slate-800 border border-slate-700 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+              <button
+                phx-click="close_configure_room"
+                class="absolute top-4 right-4 text-slate-400 hover:text-white"
+              >
+                <.icon name="hero-x-mark" class="w-6 h-6" />
+              </button>
+
+              <h3 class="text-xl font-bold text-white">Configure Room Settings</h3>
+
+              <.form
+                for={@edit_room_form}
+                id="configure-room-form"
+                phx-submit="update_room"
+                class="space-y-4"
+              >
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Room Title</label>
+                  <.input
+                    field={@edit_room_form[:title]}
+                    type="text"
+                    required
+                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Room Slug (URL identifier)</label>
+                  <.input
+                    field={@edit_room_form[:slug]}
+                    type="text"
+                    required
+                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Assigned Room Admin</label>
+                  <select
+                    name="room[admin_id]"
+                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
+                  >
+                    <option value="">Select Room Admin (Unassigned)...</option>
+                    <%= for admin <- @room_admins do %>
+                      <option value={admin.id} selected={@edit_room_form[:admin_id].value == admin.id}>
+                        {admin.username}
+                      </option>
+                    <% end %>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Max Word Limit</label>
+                  <.input
+                    field={@edit_room_form[:word_limit]}
+                    type="number"
+                    required
+                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Intro / Description Text</label>
+                  <.input
+                    field={@edit_room_form[:intro_text]}
+                    type="textarea"
+                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm resize-none h-20"
+                  />
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    phx-click="close_configure_room"
+                    class="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    class="px-4 py-2 rounded-xl text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-white"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </.form>
+            </div>
+          </div>
+        <% end %>
 
         <!-- Create Room Modal -->
         <%= if @show_create_room_modal? do %>
