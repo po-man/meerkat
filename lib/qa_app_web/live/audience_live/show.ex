@@ -36,11 +36,30 @@ defmodule QaAppWeb.AudienceLive.Show do
          |> assign(:user_voted_ids, user_voted_ids)
          |> assign(:user_question, user_question)
          |> assign(:form, form)
+         |> assign(:word_count, 0)
          |> assign(:submitted?, not is_nil(user_question))}
     end
   end
 
-  def handle_event("submit_question", %{"content" => content}, socket) do
+  def handle_event("validate_question", params, socket) do
+    content = params["content"] || get_in(params, ["question", "content"]) || ""
+    room = socket.assigns.room
+    words = content |> String.trim() |> String.split(~r/\s+/, trim: true)
+    word_count = if content == "", do: 0, else: length(words)
+
+    changeset =
+      %QaApp.Engagement.Question{room_id: room.id, session_id: socket.assigns.session_id}
+      |> QaApp.Engagement.Question.changeset(%{"content" => content}, room.word_limit)
+      |> Map.put(:action, :validate)
+
+    {:noreply,
+     socket
+     |> assign(:word_count, word_count)
+     |> assign(:form, to_form(changeset))}
+  end
+
+  def handle_event("submit_question", params, socket) do
+    content = params["content"] || get_in(params, ["question", "content"]) || ""
     room = socket.assigns.room
     session_id = socket.assigns.session_id
 
@@ -54,8 +73,12 @@ defmodule QaAppWeb.AudienceLive.Show do
          |> put_flash(:info, "Question submitted successfully!")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        words = content |> String.trim() |> String.split(~r/\s+/, trim: true)
+        word_count = if content == "", do: 0, else: length(words)
+
         {:noreply,
          socket
+         |> assign(:word_count, word_count)
          |> assign(:form, to_form(changeset))}
     end
   end
@@ -135,7 +158,13 @@ defmodule QaAppWeb.AudienceLive.Show do
             </div>
           <% else %>
             <h3 class="text-lg font-semibold text-white mb-3">Ask a Question Anonymously</h3>
-            <.form for={@form} id="question-form" phx-submit="submit_question" class="space-y-4">
+            <.form
+              for={@form}
+              id="question-form"
+              phx-change="validate_question"
+              phx-submit="submit_question"
+              class="space-y-4"
+            >
               <div>
                 <.input
                   field={@form[:content]}
@@ -145,12 +174,22 @@ defmodule QaAppWeb.AudienceLive.Show do
                 />
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-xs text-slate-400">
-                  Maximum {@room.word_limit} words. Anonymous submission.
-                </span>
+                <div class="flex items-center gap-2">
+                  <span class={[
+                    "px-2.5 py-1 rounded-lg text-xs font-bold border transition-all",
+                    if(@word_count > @room.word_limit,
+                      do: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+                      else: "bg-slate-900 text-slate-300 border-slate-700"
+                    )
+                  ]}>
+                    {@word_count} / {@room.word_limit} words
+                  </span>
+                  <span class="text-xs text-slate-400">Anonymous submission</span>
+                </div>
                 <button
                   type="submit"
-                  class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/20 transition-all duration-200"
+                  disabled={@word_count > @room.word_limit}
+                  class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <.icon name="hero-paper-airplane" class="w-4 h-4" /> Submit
                 </button>
