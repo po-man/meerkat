@@ -167,7 +167,9 @@ defmodule QaAppWeb.AudienceLive.Show do
             >
               <div>
                 <.input
-                  field={@form[:content]}
+                  id="question-content-input"
+                  name={@form[:content].name}
+                  value={@form[:content].value}
                   type="textarea"
                   placeholder="What would you like to ask?"
                   class="w-full bg-slate-900/90 border-slate-700 text-white rounded-xl p-3.5 focus:border-indigo-500 focus:ring-indigo-500 resize-none h-28"
