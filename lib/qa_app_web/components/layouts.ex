@@ -56,13 +56,6 @@ defmodule QaAppWeb.Layouts do
             >
               Sign Out
             </.link>
-          <% else %>
-            <.link
-              href={~p"/login"}
-              class="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all"
-            >
-              Admin Login
-            </.link>
           <% end %>
         </div>
       </div>
