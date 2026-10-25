@@ -5,4 +5,12 @@ defmodule QaAppWeb.PageControllerTest do
     conn = get(conn, ~p"/")
     assert html_response(conn, 200) =~ "Real-Time Anonymous Q"
   end
+
+  test "does not link to the admin sign-in page", %{conn: conn} do
+    conn = get(conn, ~p"/")
+    html = html_response(conn, 200)
+
+    refute html =~ QaAppWeb.AdminAuth.secret_path()
+    refute html =~ "Admin Login"
+  end
 end

@@ -22,12 +22,13 @@ defmodule QaAppWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
-    get "/login", SessionController, :new
-    post "/login", SessionController, :create
-    delete "/logout", SessionController, :delete
 
-    get "/super-admin/setup", SetupController, :new
-    post "/super-admin/setup", SetupController, :create
+    # Combined sign-in / first-time setup page.
+    # The path is intentionally secret (not linked from any public page),
+    # see QaAppWeb.AdminAuth.
+    get QaAppWeb.AdminAuth.secret_path(), SessionController, :new
+    post QaAppWeb.AdminAuth.secret_path(), SessionController, :create
+    delete "/logout", SessionController, :delete
   end
 
   # Audience LiveView Routes
