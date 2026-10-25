@@ -86,7 +86,7 @@ defmodule QaAppWeb.AdminLive.Show do
 
   def render(assigns) do
     ~H"""
-    <QaAppWeb.Layouts.app flash={@flash}>
+    <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
       <div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
         <!-- Top Admin Banner -->
         <div class="bg-slate-800/80 backdrop-blur-md rounded-2xl p-6 border border-indigo-500/30 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">

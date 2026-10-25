@@ -15,7 +15,7 @@ defmodule QaAppWeb.AdminLive.Dashboard do
 
   def render(assigns) do
     ~H"""
-    <QaAppWeb.Layouts.app flash={@flash}>
+    <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
       <div class="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <div class="flex items-center justify-between">
           <div>

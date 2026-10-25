@@ -137,7 +137,7 @@ defmodule QaAppWeb.SuperAdminLive.Index do
 
   def render(assigns) do
     ~H"""
-    <QaAppWeb.Layouts.app flash={@flash}>
+    <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
       <div class="max-w-6xl mx-auto px-4 py-8 space-y-8">
         <div class="flex items-center justify-between border-b border-slate-700/60 pb-6">
           <div>

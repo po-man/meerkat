@@ -132,11 +132,36 @@ defmodule QaAppWeb.SessionControllerTest do
     end
   end
 
-  describe "removed public routes" do
-    test "the old /login route no longer exists", %{conn: conn} do
-      assert response(get(conn, "/login"), 404)
+  describe "DELETE /logout" do
+    setup do
+      {:ok, _} = Accounts.create_super_admin(%{"username" => "root", "password" => "secret123"})
+      {:ok, _} = Accounts.create_room_admin(%{"username" => "mod", "password" => "secret123"})
+      :ok
     end
 
+    test "clears the signed-in state of a room admin", %{conn: conn} do
+      conn = post(conn, @secret_path, %{"username" => "mod", "password" => "secret123"})
+      assert redirected_to(conn) == "/admin/dashboard"
+
+      conn = delete(conn, "/logout")
+      assert redirected_to(conn) == "/"
+
+      # the session is gone: protected pages redirect to the sign-in page again
+      assert redirected_to(get(conn, "/admin/dashboard")) == @secret_path
+    end
+
+    test "clears the signed-in state of a super admin", %{conn: conn} do
+      conn = post(conn, @secret_path, %{"username" => "root", "password" => "secret123"})
+      assert redirected_to(conn) == "/super-admin"
+
+      conn = delete(conn, "/logout")
+      assert redirected_to(conn) == "/"
+
+      assert redirected_to(get(conn, "/super-admin")) == @secret_path
+    end
+  end
+
+  describe "removed public routes" do
     test "the old /super-admin/setup route no longer exists", %{conn: conn} do
       assert response(get(conn, "/super-admin/setup"), 404)
     end

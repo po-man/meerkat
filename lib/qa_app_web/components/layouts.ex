@@ -27,6 +27,10 @@ defmodule QaAppWeb.Layouts do
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
 
+  attr :current_user, :map,
+    default: nil,
+    doc: "the signed-in user (QaApp.Accounts.User). Pass it on auth-protected pages to show the user chip and Sign Out button"
+
   attr :current_scope, :map,
     default: nil,
     doc: "the current [scope](https://phoenix.hexdocs.pm/scopes.html)"
@@ -45,11 +49,12 @@ defmodule QaAppWeb.Layouts do
         </a>
 
         <div class="flex items-center gap-3">
-          <%= if assigns[:current_user] do %>
+          <%= if @current_user do %>
             <span class="text-xs text-slate-300 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
-              {assigns.current_user.username} ({assigns.current_user.role})
+              {@current_user.username} ({@current_user.role})
             </span>
             <.link
+              id="sign-out"
               href={~p"/logout"}
               method="delete"
               class="text-xs font-semibold text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all"
