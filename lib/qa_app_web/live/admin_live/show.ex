@@ -190,7 +190,7 @@ defmodule QaAppWeb.AdminLive.Show do
                         <span class="font-mono text-xs text-ink-3 tabular-nums">{i + 1}</span>
                       </div>
 
-                      <div class="col-span-10 sm:col-span-11 flex items-start gap-4">
+                      <div class="col-span-10 sm:col-span-8 flex items-start gap-4">
                         <span class="shrink-0 w-11 py-2 rounded border border-line-strong text-ink flex flex-col items-center justify-center gap-0.5 font-mono text-xs tabular-nums">
                           <.icon name="hero-chevron-up" class="size-3.5" />
                           {question.vote_count}
@@ -208,7 +208,7 @@ defmodule QaAppWeb.AdminLive.Show do
                         </div>
                       </div>
 
-                      <div class="col-span-12 sm:col-span-3 flex sm:justify-end pt-3 sm:pt-1">
+                      <div class="col-span-12 sm:col-span-3 flex justify-end pt-3 sm:pt-1">
                         <button
                           phx-click="mark_asked"
                           phx-value-id={question.id}
@@ -242,7 +242,7 @@ defmodule QaAppWeb.AdminLive.Show do
                         <span class="font-mono text-xs text-ink-3 tabular-nums">{i + 1}</span>
                       </div>
 
-                      <div class="col-span-10 sm:col-span-11 flex items-start gap-4">
+                      <div class="col-span-10 sm:col-span-8 flex items-start gap-4">
                         <span class="shrink-0 w-11 py-2 rounded border border-line text-ink-3 flex flex-col items-center justify-center gap-0.5 font-mono text-xs tabular-nums">
                           <.icon name="hero-chevron-up" class="size-3.5" />
                           {question.vote_count}
@@ -263,7 +263,7 @@ defmodule QaAppWeb.AdminLive.Show do
                         </div>
                       </div>
 
-                      <div class="col-span-12 sm:col-span-3 flex sm:justify-end pt-3 sm:pt-1">
+                      <div class="col-span-12 sm:col-span-3 flex justify-end pt-3 sm:pt-1">
                         <button
                           phx-click="mark_unasked"
                           phx-value-id={question.id}
