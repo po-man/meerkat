@@ -2,6 +2,7 @@ defmodule QaAppWeb.AdminLiveTest do
   use QaAppWeb.ConnCase
 
   alias QaApp.Accounts
+  alias QaApp.Engagement
   alias QaApp.Events
   alias QaAppWeb.AdminAuth
 
@@ -28,7 +29,8 @@ defmodule QaAppWeb.AdminLiveTest do
     end
 
     test "is shown on the room moderator page", %{conn: conn} do
-      {:ok, owner} = Accounts.create_room_admin(%{"username" => "owner", "password" => "secret123"})
+      {:ok, owner} =
+        Accounts.create_room_admin(%{"username" => "owner", "password" => "secret123"})
 
       {:ok, room} =
         Events.create_room(%{
@@ -60,6 +62,43 @@ defmodule QaAppWeb.AdminLiveTest do
 
       conn = get(conn, "/super-admin")
       assert redirected_to(conn) == AdminAuth.secret_path()
+    end
+  end
+
+  describe "moderation pages render with live content" do
+    setup do
+      {:ok, owner} =
+        Accounts.create_room_admin(%{"username" => "moder", "password" => "secret123"})
+
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "render-room",
+          "title" => "Render Room",
+          "word_limit" => 50,
+          "is_active" => true,
+          "admin_id" => owner.id
+        })
+
+      {:ok, _} =
+        Engagement.create_question(room, "audience-1", %{"content" => "Queue this question"})
+
+      {:ok, owner: owner, room: room}
+    end
+
+    test "room dashboard lists the assigned room", %{conn: conn, owner: owner} do
+      conn = login_as(conn, owner.username)
+
+      html = html_response(get(conn, "/admin/dashboard"), 200)
+      assert html =~ "Render Room"
+      assert html =~ "/r/render-room"
+    end
+
+    test "moderator page shows the question queue", %{conn: conn, owner: owner, room: room} do
+      conn = login_as(conn, owner.username)
+
+      html = html_response(get(conn, "/admin/r/#{room.slug}"), 200)
+      assert html =~ "Queue this question"
+      assert html =~ ~s(id="admin-questions-feed")
     end
   end
 end

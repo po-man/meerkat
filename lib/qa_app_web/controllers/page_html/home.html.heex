@@ -1,17 +1,26 @@
-<Layouts.flash_group flash={@flash} />
-<div class="min-h-[85vh] flex flex-col items-center justify-center px-4 py-12 text-center">
-  <div class="max-w-2xl space-y-6 bg-slate-800/80 backdrop-blur-md p-8 sm:p-12 rounded-3xl border border-slate-700/60 shadow-2xl">
-    <div class="mx-auto w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/20 shadow-inner">
-      <.icon name="hero-chat-bubble-bottom-center-text" class="w-8 h-8" />
+<QaAppWeb.Layouts.app flash={@flash}>
+  <div class="max-w-6xl mx-auto px-6 pt-20 sm:pt-28 pb-24">
+    <div class="grid grid-cols-12 gap-x-6">
+      <div class="col-span-12 lg:col-span-8">
+        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
+          <span class="w-2 h-2 bg-accent"></span> Town halls · Conferences · Meetups
+        </p>
+
+        <h1 class="mt-6 text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-[-0.04em] leading-[1.02] text-ink">
+          Real-Time Anonymous Q&amp;A<span class="text-accent">.</span>
+        </h1>
+      </div>
+
+      <div class="col-span-12 lg:col-span-4 lg:col-start-9 mt-10 lg:mt-24 flex flex-col justify-end gap-6">
+        <p class="text-[15px] leading-relaxed text-ink-2">
+          Frictionless, live audience interaction for town halls, conferences, and meetups. Join an
+          active room with the event code shared by its host.
+        </p>
+
+        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+          One question per device
+        </p>
+      </div>
     </div>
-
-    <h1 class="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
-      Real-Time Anonymous Q&A Platform
-    </h1>
-
-    <p class="text-slate-300 text-base sm:text-lg leading-relaxed">
-      Frictionless, live audience interaction for town halls, conferences, and meetups. Join an
-      active room with the event code shared by its host.
-    </p>
   </div>
-</div>
+</QaAppWeb.Layouts.app>
