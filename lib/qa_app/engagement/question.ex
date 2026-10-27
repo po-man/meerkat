@@ -16,26 +16,25 @@ defmodule QaApp.Engagement.Question do
     timestamps(type: :utc_datetime)
   end
 
-  def changeset(question, attrs, word_limit \\ 50) do
+  def changeset(question, attrs, char_limit \\ 320) do
     question
     |> cast(attrs, [:room_id, :session_id, :content, :vote_count, :is_asked])
     |> validate_required([:room_id, :session_id, :content])
-    |> validate_word_count(:content, word_limit)
+    |> validate_char_count(:content, char_limit)
     |> unique_constraint([:room_id, :session_id],
       name: :engagement_questions_room_id_session_id_index,
       message: "You have already submitted a question for this event."
     )
   end
 
-  defp validate_word_count(changeset, field, limit) do
+  defp validate_char_count(changeset, field, limit) do
     validate_change(changeset, field, fn _, value ->
-      words =
-        value
-        |> String.trim()
-        |> String.split(~r/\s+/, trim: true)
+      count = if is_binary(value), do: String.length(value), else: 0
 
-      if length(words) > limit do
-        [{field, "exceeds the limit of #{limit} words (currently #{length(words)} words)"}]
+      if count > limit do
+        [
+          {field, "exceeds the limit of #{limit} characters (currently #{count} characters)"}
+        ]
       else
         []
       end

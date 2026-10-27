@@ -48,7 +48,7 @@ defmodule QaApp.Engagement do
       |> Map.put("session_id", session_id)
 
     %Question{}
-    |> Question.changeset(attrs, room.word_limit)
+    |> Question.changeset(attrs, room.char_limit)
     |> Repo.insert()
     |> case do
       {:ok, question} ->

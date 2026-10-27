@@ -133,9 +133,9 @@ defmodule QaAppWeb.AdminLive.Settings do
 
             <div>
               <.input
-                field={@settings_form[:word_limit]}
+                field={@settings_form[:char_limit]}
                 type="number"
-                label="Max Word Limit per Question"
+                label="Max Character Limit per Question"
               />
             </div>
 

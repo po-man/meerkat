@@ -11,7 +11,7 @@ defmodule QaAppWeb.AudienceLiveTest do
       Events.create_room(%{
         "slug" => "townhall",
         "title" => "Town Hall",
-        "word_limit" => 50,
+        "char_limit" => 320,
         "is_active" => true
       })
 

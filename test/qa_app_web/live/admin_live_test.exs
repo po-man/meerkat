@@ -38,7 +38,7 @@ defmodule QaAppWeb.AdminLiveTest do
         Events.create_room(%{
           "slug" => "townhall",
           "title" => "Town Hall",
-          "word_limit" => 50,
+          "char_limit" => 320,
           "is_active" => true,
           "admin_id" => owner.id
         })
@@ -76,7 +76,7 @@ defmodule QaAppWeb.AdminLiveTest do
         Events.create_room(%{
           "slug" => "render-room",
           "title" => "Render Room",
-          "word_limit" => 50,
+          "char_limit" => 320,
           "is_active" => true,
           "admin_id" => owner.id
         })
@@ -113,7 +113,7 @@ defmodule QaAppWeb.AdminLiveTest do
         Events.create_room(%{
           "slug" => "tab-room",
           "title" => "Tab Room",
-          "word_limit" => 50,
+          "char_limit" => 320,
           "is_active" => true,
           "admin_id" => owner.id
         })
@@ -233,7 +233,7 @@ defmodule QaAppWeb.AdminLiveTest do
         Events.create_room(%{
           "slug" => "nav-room",
           "title" => "Nav Room",
-          "word_limit" => 50,
+          "char_limit" => 320,
           "is_active" => true,
           "admin_id" => owner.id
         })

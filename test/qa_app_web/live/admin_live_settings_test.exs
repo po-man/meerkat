@@ -29,7 +29,7 @@ defmodule QaAppWeb.AdminLiveSettingsTest do
           "slug" => "settings-room",
           "title" => "Settings Room",
           "intro_text" => "Original intro",
-          "word_limit" => 50,
+          "char_limit" => 50,
           "is_active" => true,
           "admin_id" => owner.id
         })
@@ -62,7 +62,7 @@ defmodule QaAppWeb.AdminLiveSettingsTest do
         room: %{
           "title" => "New Title",
           "intro_text" => "New intro",
-          "word_limit" => "75"
+          "char_limit" => "75"
         }
       )
       |> render_submit()
@@ -72,10 +72,10 @@ defmodule QaAppWeb.AdminLiveSettingsTest do
       updated_room = Events.get_room!(room.id)
       assert updated_room.title == "New Title"
       assert updated_room.intro_text == "New intro"
-      assert updated_room.word_limit == 75
+      assert updated_room.char_limit == 75
     end
 
-    test "shows validation errors for an invalid word limit", %{
+    test "shows validation errors for an invalid character limit", %{
       conn: conn,
       owner: owner,
       room: room
@@ -85,7 +85,7 @@ defmodule QaAppWeb.AdminLiveSettingsTest do
 
       html =
         view
-        |> form("#settings-form", room: %{"title" => "Valid Title", "word_limit" => "0"})
+        |> form("#settings-form", room: %{"title" => "Valid Title", "char_limit" => "0"})
         |> render_submit()
 
       assert html =~ "must be greater than 0"

@@ -31,7 +31,7 @@ defmodule QaApp.Events.Room do
     field :slug, :string
     field :title, :string, default: "Live Q&A"
     field :intro_text, :string
-    field :word_limit, :integer, default: 50
+    field :char_limit, :integer, default: 320
     field :is_active, :boolean, default: true
     field :expires_at, :utc_datetime
     field :expires_in, :string, virtual: true
@@ -51,9 +51,9 @@ defmodule QaApp.Events.Room do
   """
   def changeset(room, attrs) do
     room
-    |> cast(attrs, [:slug, :title, :intro_text, :word_limit, :is_active, :admin_id])
-    |> validate_required([:slug, :title, :word_limit, :is_active])
-    |> validate_number(:word_limit, greater_than: 0, less_than_or_equal_to: 500)
+    |> cast(attrs, [:slug, :title, :intro_text, :char_limit, :is_active, :admin_id])
+    |> validate_required([:slug, :title, :char_limit, :is_active])
+    |> validate_number(:char_limit, greater_than: 0, less_than_or_equal_to: 1000)
     |> validate_format(:slug, ~r/^[a-z0-9\-]+$/,
       message: "must contain only lowercase letters, numbers, and hyphens"
     )

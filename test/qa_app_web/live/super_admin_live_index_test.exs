@@ -47,7 +47,7 @@ defmodule QaAppWeb.SuperAdminLiveIndexTest do
           "slug" => "expiry-room",
           "title" => "Expiry Room",
           "admin_id" => "",
-          "word_limit" => "50",
+          "char_limit" => "320",
           "expires_in" => "7 days"
         }
       )
@@ -70,7 +70,7 @@ defmodule QaAppWeb.SuperAdminLiveIndexTest do
             "slug" => "invalid-expiry-room",
             "title" => "Invalid Expiry Room",
             "admin_id" => "",
-            "word_limit" => "50",
+            "char_limit" => "320",
             "expires_in" => "2 weeks"
           }
         })
@@ -86,7 +86,7 @@ defmodule QaAppWeb.SuperAdminLiveIndexTest do
         Events.create_room(%{
           "slug" => "config-no-expiry",
           "title" => "Config Room",
-          "word_limit" => 50,
+          "char_limit" => 320,
           "is_active" => true
         })
 
@@ -116,7 +116,7 @@ defmodule QaAppWeb.SuperAdminLiveIndexTest do
         Events.create_room(%{
           "slug" => "expires-soon",
           "title" => "Expires Soon",
-          "word_limit" => 50,
+          "char_limit" => 320,
           "is_active" => true,
           "expires_in" => "3 minutes"
         })

@@ -36,7 +36,7 @@ defmodule QaAppWeb.AudienceLive.Show do
          |> assign(:user_voted_ids, user_voted_ids)
          |> assign(:user_question, user_question)
          |> assign(:form, form)
-         |> assign(:word_count, 0)
+         |> assign(:char_count, 0)
          |> assign(:submitted?, not is_nil(user_question))}
     end
   end
@@ -44,17 +44,16 @@ defmodule QaAppWeb.AudienceLive.Show do
   def handle_event("validate_question", params, socket) do
     content = params["content"] || get_in(params, ["question", "content"]) || ""
     room = socket.assigns.room
-    words = content |> String.trim() |> String.split(~r/\s+/, trim: true)
-    word_count = if content == "", do: 0, else: length(words)
+    char_count = String.length(content)
 
     changeset =
       %QaApp.Engagement.Question{room_id: room.id, session_id: socket.assigns.session_id}
-      |> QaApp.Engagement.Question.changeset(%{"content" => content}, room.word_limit)
+      |> QaApp.Engagement.Question.changeset(%{"content" => content}, room.char_limit)
       |> Map.put(:action, :validate)
 
     {:noreply,
      socket
-     |> assign(:word_count, word_count)
+     |> assign(:char_count, char_count)
      |> assign(:form, to_form(changeset))}
   end
 
@@ -73,12 +72,11 @@ defmodule QaAppWeb.AudienceLive.Show do
          |> put_flash(:info, "Question submitted successfully!")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        words = content |> String.trim() |> String.split(~r/\s+/, trim: true)
-        word_count = if content == "", do: 0, else: length(words)
+        char_count = String.length(content)
 
         {:noreply,
          socket
-         |> assign(:word_count, word_count)
+         |> assign(:char_count, char_count)
          |> assign(:form, to_form(changeset))}
     end
   end
@@ -223,6 +221,7 @@ defmodule QaAppWeb.AudienceLive.Show do
                   value={@form[:content].value}
                   type="textarea"
                   placeholder="What would you like to ask?"
+                  maxlength={@room.char_limit}
                   class="w-full bg-transparent border-0 border-b border-line-strong rounded-none px-0 pt-2 pb-3 text-[17px] leading-relaxed text-ink placeholder:text-ink-3 resize-none h-28 focus:border-ink focus:outline-none transition-colors"
                 />
 
@@ -230,12 +229,13 @@ defmodule QaAppWeb.AudienceLive.Show do
                   <div class="flex items-center gap-4">
                     <span class={[
                       "font-mono text-xs tabular-nums",
-                      if(@word_count > @room.word_limit,
+                      if(@char_count > @room.char_limit,
                         do: "text-danger",
                         else: "text-ink-3"
                       )
                     ]}>
-                      {@word_count} / {@room.word_limit}
+                      {@char_count} / {@room.char_limit}
+                      <span class="normal-case">characters</span>
                     </span>
                     <span class="hidden sm:block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
                       Anonymous submission
@@ -244,7 +244,7 @@ defmodule QaAppWeb.AudienceLive.Show do
 
                   <button
                     type="submit"
-                    disabled={@word_count > @room.word_limit}
+                    disabled={@char_count > @room.char_limit}
                     class="inline-flex items-center gap-2 h-10 px-5 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
                   >
                     Submit <.icon name="hero-arrow-up-right" class="size-3.5" />

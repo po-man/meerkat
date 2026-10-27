@@ -206,7 +206,7 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                     Assigned Admin
                   </th>
                   <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
-                    Word Limit
+                    Character Limit
                   </th>
                   <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
                     Expires
@@ -231,7 +231,7 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                       <% end %>
                     </td>
                     <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
-                      {room.word_limit} words
+                      {room.char_limit} characters
                     </td>
                     <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
                       {format_expiry(room.expires_at)}
@@ -326,10 +326,10 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                 </div>
 
                 <.input
-                  field={@edit_room_form[:word_limit]}
+                  field={@edit_room_form[:char_limit]}
                   type="number"
                   required
-                  label="Max Word Limit"
+                  label="Max Character Limit"
                 />
 
                 <.input
@@ -416,10 +416,10 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                 </div>
 
                 <.input
-                  field={@room_form[:word_limit]}
+                  field={@room_form[:char_limit]}
                   type="number"
-                  value="50"
-                  label="Max Word Limit"
+                  value="320"
+                  label="Max Character Limit"
                 />
 
                 <.input
