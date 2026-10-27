@@ -295,7 +295,7 @@ defmodule QaAppWeb.AudienceLive.Show do
                     own? && "bg-surface -mx-2 sm:-mx-3 px-2 sm:px-3 rounded-lg"
                   ]}
                 >
-                  <div class="col-span-2 sm:col-span-1">
+                  <div class="col-span-1 sm:col-span-1">
                     <span class={[
                       "hidden sm:block font-mono text-xs tabular-nums",
                       if(own?, do: "text-accent", else: "text-ink-3")

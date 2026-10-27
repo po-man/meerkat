@@ -186,7 +186,7 @@ defmodule QaAppWeb.AdminLive.Show do
                       id={"admin-q-#{question.id}"}
                       class="grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-5 border-b border-line"
                     >
-                      <div class="col-span-2 sm:col-span-1">
+                      <div class="col-span-1 sm:col-span-1">
                         <span class="font-mono text-xs text-ink-3 tabular-nums">{i + 1}</span>
                       </div>
 
