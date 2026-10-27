@@ -37,6 +37,12 @@ defmodule QaAppWeb.CoreComponents do
   attr :flash, :map, default: %{}, doc: "the map of flash messages to display"
   attr :title, :string, default: nil
   attr :kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup"
+
+  attr :autodismiss,
+       :boolean,
+       default: true,
+       doc: "whether the flash auto-dismisses after a few seconds (with a bottom progress bar)"
+
   attr :rest, :global, doc: "the arbitrary HTML attributes to add to the flash container"
 
   slot :inner_block, doc: "the optional inner block that renders the flash message"
@@ -48,13 +54,15 @@ defmodule QaAppWeb.CoreComponents do
     <div
       :if={msg = render_slot(@inner_block) || Phoenix.Flash.get(@flash, @kind)}
       id={@id}
-      phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
+      phx-hook=".FlashNotice"
+      data-flash-kind={@kind}
+      data-flash-autodismiss={to_string(@autodismiss)}
       role="alert"
       class="fixed top-4 right-4 z-50 w-80 max-w-[calc(100vw-2rem)]"
       {@rest}
     >
       <div class={[
-        "bg-paper border border-line-strong border-l-2 rounded p-3 flex items-start gap-2.5",
+        "relative overflow-hidden bg-paper border border-line-strong border-l-2 rounded p-3 flex items-start gap-2.5",
         if(@kind == :info, do: "border-l-accent", else: "border-l-danger")
       ]}>
         <.icon :if={@kind == :info} name="hero-information-circle" class="size-4 shrink-0 text-ink-2" />
@@ -67,14 +75,41 @@ defmodule QaAppWeb.CoreComponents do
           <p :if={@title} class="font-semibold">{@title}</p>
           <p>{msg}</p>
         </div>
-        <button
-          type="button"
-          class="shrink-0 text-ink-3 hover:text-ink transition-colors"
-          aria-label={gettext("close")}
-        >
-          <.icon name="hero-x-mark" class="size-4" />
-        </button>
+        <span
+          :if={@autodismiss}
+          aria-hidden="true"
+          class="flash-progress absolute bottom-0 left-0 right-0 h-0.5 bg-accent origin-left"
+        ></span>
       </div>
+
+      <script :type={Phoenix.LiveView.ColocatedHook} name=".FlashNotice">
+        export default {
+          mounted() {
+            if (this.el.dataset.flashAutodismiss !== "true") return;
+            this.kind = this.el.dataset.flashKind;
+            this.dismissTimer = setTimeout(() => this.dismiss(), 5000);
+          },
+          dismiss() {
+            const el = this.el;
+            el.style.transition = "opacity 300ms ease, transform 300ms ease";
+            el.style.opacity = "0";
+            el.style.transform = "translateY(-6px)";
+
+            this.hideTimer = setTimeout(() => {
+              // Clear the server-side flash now that the bubble is gone, so it
+              // won't reappear on a later render.
+              if (this.el.isConnected) {
+                this.pushEvent("lv:clear-flash", {key: this.kind});
+              }
+              el.remove();
+            }, 300);
+          },
+          destroyed() {
+            clearTimeout(this.dismissTimer);
+            clearTimeout(this.hideTimer);
+          }
+        }
+      </script>
     </div>
     """
   end
