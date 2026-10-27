@@ -26,6 +26,11 @@ config :swoosh, :api_client, false
 # Print only warnings and errors during test
 config :logger, level: :warning
 
+# The room expiry scheduler queries the database on boot (housekeeping), which
+# conflicts with the SQL sandbox in manual mode. It is exercised separately in
+# its own tests via `start_supervised!/1`.
+config :qa_app, :room_expiry_scheduler_enabled, false
+
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 

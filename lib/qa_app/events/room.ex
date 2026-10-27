@@ -4,12 +4,37 @@ defmodule QaApp.Events.Room do
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
+
+  @expiry_options [
+    "3 minutes",
+    "30 minutes",
+    "1 hour",
+    "6 hours",
+    "12 hours",
+    "1 day",
+    "3 days",
+    "7 days"
+  ]
+
+  @expiry_durations %{
+    "3 minutes" => 3,
+    "30 minutes" => 30,
+    "1 hour" => 60,
+    "6 hours" => 6 * 60,
+    "12 hours" => 12 * 60,
+    "1 day" => 24 * 60,
+    "3 days" => 3 * 24 * 60,
+    "7 days" => 7 * 24 * 60
+  }
+
   schema "events_rooms" do
     field :slug, :string
     field :title, :string, default: "Live Q&A"
     field :intro_text, :string
     field :word_limit, :integer, default: 50
     field :is_active, :boolean, default: true
+    field :expires_at, :utc_datetime
+    field :expires_in, :string, virtual: true
 
     belongs_to :admin, QaApp.Accounts.User, foreign_key: :admin_id, type: :binary_id
     has_many :questions, QaApp.Engagement.Question, foreign_key: :room_id
@@ -17,6 +42,13 @@ defmodule QaApp.Events.Room do
     timestamps(type: :utc_datetime)
   end
 
+  @doc "The allowed expiry duration labels offered when creating a room."
+  def expiry_options, do: @expiry_options
+
+  @doc """
+  Changeset for updating a room. Room expiry is locked at creation time and
+  is intentionally not castable here, so it cannot be changed afterwards.
+  """
   def changeset(room, attrs) do
     room
     |> cast(attrs, [:slug, :title, :intro_text, :word_limit, :is_active, :admin_id])
@@ -27,5 +59,37 @@ defmodule QaApp.Events.Room do
     )
     |> validate_length(:slug, min: 2, max: 100)
     |> unique_constraint(:slug)
+  end
+
+  @doc """
+  Changeset used when creating a room. Requires picking one of the allowed
+  expiry durations and derives the absolute `expires_at` timestamp from it.
+  """
+  def creation_changeset(room, attrs) do
+    room
+    |> changeset(attrs)
+    # Force the chosen duration into the changeset so its validation always runs,
+    # including when the (defaulted) value equals the struct field's value.
+    |> put_change(:expires_in, Map.get(attrs, "expires_in"))
+    |> validate_required([:expires_in], message: "must be selected")
+    |> validate_inclusion(:expires_in, @expiry_options, message: "is not a valid option")
+    |> put_expires_at()
+  end
+
+  defp put_expires_at(changeset) do
+    case get_change(changeset, :expires_in) do
+      label when is_binary(label) ->
+        case Map.fetch(@expiry_durations, label) do
+          {:ok, minutes} ->
+            now = DateTime.utc_now() |> DateTime.truncate(:second)
+            put_change(changeset, :expires_at, DateTime.add(now, minutes * 60, :second))
+
+          :error ->
+            changeset
+        end
+
+      _ ->
+        changeset
+    end
   end
 end

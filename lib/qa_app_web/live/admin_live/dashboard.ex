@@ -6,11 +6,20 @@ defmodule QaAppWeb.AdminLive.Dashboard do
   def mount(_params, _session, socket) do
     current_user = socket.assigns[:current_user]
 
-    rooms =
-      Events.list_rooms()
-      |> Enum.filter(fn r -> r.admin_id == current_user.id end)
+    if connected?(socket) do
+      Events.subscribe_rooms()
+    end
 
-    {:ok, assign(socket, :rooms, rooms)}
+    {:ok, assign(socket, :rooms, rooms_for(current_user))}
+  end
+
+  def handle_info({:room_expired, _room_id}, socket) do
+    {:noreply, assign(socket, :rooms, rooms_for(socket.assigns.current_user))}
+  end
+
+  defp rooms_for(current_user) do
+    Events.list_rooms()
+    |> Enum.filter(fn r -> r.admin_id == current_user.id end)
   end
 
   def render(assigns) do

@@ -2,6 +2,7 @@ defmodule QaAppWeb.SuperAdminLive.Index do
   use QaAppWeb, :live_view
 
   alias QaApp.Events
+  alias QaApp.Events.Room
   alias QaApp.Accounts
 
   def mount(_params, _session, socket) do
@@ -9,7 +10,11 @@ defmodule QaAppWeb.SuperAdminLive.Index do
     users = Accounts.list_users()
     room_admins = Enum.filter(users, fn u -> u.role == :room_admin end)
 
-    room_form = to_form(Events.change_room(%QaApp.Events.Room{}))
+    if connected?(socket) do
+      Events.subscribe_rooms()
+    end
+
+    room_form = to_form(Events.change_room(%Room{}))
 
     {:ok,
      socket
@@ -24,6 +29,10 @@ defmodule QaAppWeb.SuperAdminLive.Index do
      |> assign(:show_configure_room_modal?, false)
      |> assign(:admin_username, "")
      |> assign(:admin_password, "")}
+  end
+
+  def handle_info({:room_expired, _room_id}, socket) do
+    {:noreply, assign(socket, :rooms, Events.list_rooms())}
   end
 
   def handle_event("open_create_room", _, socket) do
@@ -73,7 +82,7 @@ defmodule QaAppWeb.SuperAdminLive.Index do
          socket
          |> assign(:rooms, rooms)
          |> assign(:show_create_room_modal?, false)
-         |> assign(:room_form, to_form(Events.change_room(%QaApp.Events.Room{})))
+         |> assign(:room_form, to_form(Events.change_room(%Room{})))
          |> put_flash(:info, "Room created successfully.")}
 
       {:error, changeset} ->
@@ -135,6 +144,12 @@ defmodule QaAppWeb.SuperAdminLive.Index do
     {:noreply, assign(socket, :rooms, rooms)}
   end
 
+  defp format_expiry(%DateTime{} = expires_at) do
+    Calendar.strftime(expires_at, "%b %d, %Y %I:%M %p") <> " UTC"
+  end
+
+  defp format_expiry(_), do: "—"
+
   def render(assigns) do
     ~H"""
     <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
@@ -193,6 +208,9 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                   <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
                     Word Limit
                   </th>
+                  <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
+                    Expires
+                  </th>
                   <th class="py-3 border-b border-line-strong text-right">
                     <span class="sr-only">Actions</span>
                   </th>
@@ -214,6 +232,9 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                     </td>
                     <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
                       {room.word_limit} words
+                    </td>
+                    <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
+                      {format_expiry(room.expires_at)}
                     </td>
                     <td class="py-4 align-top text-right whitespace-nowrap">
                       <div class="inline-flex items-center gap-4">
@@ -399,6 +420,14 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                   type="number"
                   value="50"
                   label="Max Word Limit"
+                />
+
+                <.input
+                  field={@room_form[:expires_in]}
+                  type="select"
+                  value="7 days"
+                  options={Room.expiry_options()}
+                  label="Room Expiry (auto-cleanup)"
                 />
 
                 <div class="flex items-center justify-end gap-3 pt-2">

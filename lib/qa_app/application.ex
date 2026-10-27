@@ -7,18 +7,25 @@ defmodule QaApp.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      QaAppWeb.Telemetry,
-      QaApp.Repo,
-      {Ecto.Migrator,
-       repos: Application.fetch_env!(:qa_app, :ecto_repos), skip: skip_migrations?()},
-      {DNSCluster, query: Application.get_env(:qa_app, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: QaApp.PubSub},
-      # Start a worker by calling: QaApp.Worker.start_link(arg)
-      # {QaApp.Worker, arg},
-      # Start to serve requests, typically the last entry
-      QaAppWeb.Endpoint
-    ]
+    room_expiry_scheduler =
+      if Application.get_env(:qa_app, :room_expiry_scheduler_enabled, true) do
+        QaApp.RoomExpiryScheduler
+      end
+
+    children =
+      [
+        QaAppWeb.Telemetry,
+        QaApp.Repo,
+        {Ecto.Migrator,
+         repos: Application.fetch_env!(:qa_app, :ecto_repos), skip: skip_migrations?()},
+        {DNSCluster, query: Application.get_env(:qa_app, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: QaApp.PubSub},
+        # Runs housekeeping on boot and keeps a timer for the soonest room expiry.
+        room_expiry_scheduler,
+        # Start to serve requests, typically the last entry
+        QaAppWeb.Endpoint
+      ]
+      |> Enum.reject(&is_nil/1)
 
     # See https://elixir.hexdocs.pm/Supervisor.html
     # for other strategies and supported options
