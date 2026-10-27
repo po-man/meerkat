@@ -223,4 +223,51 @@ defmodule QaAppWeb.AdminLiveTest do
       assert has_element?(view, "#raised-questions-feed #admin-q-#{asked_question.id}")
     end
   end
+
+  describe "moderator page navigation tabs" do
+    setup do
+      {:ok, owner} =
+        Accounts.create_room_admin(%{"username" => "nav-owner", "password" => "secret123"})
+
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "nav-room",
+          "title" => "Nav Room",
+          "word_limit" => 50,
+          "is_active" => true,
+          "admin_id" => owner.id
+        })
+
+      {:ok, owner: owner, room: room}
+    end
+
+    test "moderator page shows the Questions and Settings tabs", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/admin/r/#{room.slug}")
+
+      assert has_element?(view, "#room-tabs")
+      assert has_element?(view, "#room-tab-questions")
+      assert has_element?(view, "#room-tab-settings")
+    end
+
+    test "navigating to the Settings tab opens the settings page", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/admin/r/#{room.slug}")
+
+      result = view |> element("#room-tab-settings") |> render_click()
+
+      {:ok, view, _html} = follow_redirect(result, conn)
+
+      assert has_element?(view, "#settings-form")
+      assert has_element?(view, "#room-tab-settings")
+    end
+  end
 end

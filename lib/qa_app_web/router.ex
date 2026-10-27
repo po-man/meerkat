@@ -46,6 +46,7 @@ defmodule QaAppWeb.Router do
       pipe_through :browser
 
       live "/dashboard", AdminLive.Dashboard, :index
+      live "/r/:slug/settings", AdminLive.Settings, :settings
       live "/r/:slug", AdminLive.Show, :show
       get "/r/:slug/export.csv", ExportController, :csv
       get "/r/:slug/qr.png", ExportController, :qr
