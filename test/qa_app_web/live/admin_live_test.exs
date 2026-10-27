@@ -1,6 +1,8 @@
 defmodule QaAppWeb.AdminLiveTest do
   use QaAppWeb.ConnCase
 
+  import Phoenix.LiveViewTest
+
   alias QaApp.Accounts
   alias QaApp.Engagement
   alias QaApp.Events
@@ -99,6 +101,126 @@ defmodule QaAppWeb.AdminLiveTest do
       html = html_response(get(conn, "/admin/r/#{room.slug}"), 200)
       assert html =~ "Queue this question"
       assert html =~ ~s(id="admin-questions-feed")
+    end
+  end
+
+  describe "raised and asked question tabs" do
+    setup do
+      {:ok, owner} =
+        Accounts.create_room_admin(%{"username" => "moder", "password" => "secret123"})
+
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "tab-room",
+          "title" => "Tab Room",
+          "word_limit" => 50,
+          "is_active" => true,
+          "admin_id" => owner.id
+        })
+
+      {:ok, raised_question} =
+        Engagement.create_question(room, "audience-1", %{"content" => "Question still raised"})
+
+      {:ok, asked_question} =
+        Engagement.create_question(room, "audience-2", %{"content" => "Question already asked"})
+
+      {:ok, asked_question} = Engagement.mark_as_asked(asked_question)
+
+      {:ok,
+       owner: owner, room: room, raised_question: raised_question, asked_question: asked_question}
+    end
+
+    defp open_room(conn, owner, slug, query \\ "") do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/admin/r/#{slug}#{query}")
+      view
+    end
+
+    test "shows the raised questions tab by default", %{
+      conn: conn,
+      owner: owner,
+      room: room,
+      raised_question: raised_question,
+      asked_question: asked_question
+    } do
+      view = open_room(conn, owner, room.slug)
+
+      assert has_element?(view, "#admin-tabs")
+      assert has_element?(view, "#admin-tab-raised")
+      assert has_element?(view, "#admin-tab-asked")
+      assert has_element?(view, "#raised-questions-feed")
+      assert has_element?(view, "#raised-questions-feed #admin-q-#{raised_question.id}")
+      refute has_element?(view, "#raised-questions-feed #admin-q-#{asked_question.id}")
+      refute has_element?(view, "#asked-questions-feed")
+    end
+
+    test "switches to the asked questions tab", %{
+      conn: conn,
+      owner: owner,
+      room: room,
+      raised_question: raised_question,
+      asked_question: asked_question
+    } do
+      view = open_room(conn, owner, room.slug)
+
+      view |> element("#admin-tab-asked") |> render_click()
+
+      assert has_element?(view, "#asked-questions-feed")
+      assert has_element?(view, "#asked-questions-feed #admin-q-#{asked_question.id}")
+      refute has_element?(view, "#asked-questions-feed #admin-q-#{raised_question.id}")
+      refute has_element?(view, "#raised-questions-feed")
+    end
+
+    test "loads the asked tab directly via the tab query param", %{
+      conn: conn,
+      owner: owner,
+      room: room,
+      asked_question: asked_question
+    } do
+      view = open_room(conn, owner, room.slug, "?tab=asked")
+
+      assert has_element?(view, "#asked-questions-feed")
+      assert has_element?(view, "#asked-questions-feed #admin-q-#{asked_question.id}")
+    end
+
+    test "marking a raised question as asked moves it to the asked tab", %{
+      conn: conn,
+      owner: owner,
+      room: room,
+      raised_question: raised_question
+    } do
+      view = open_room(conn, owner, room.slug)
+
+      view
+      |> element(~s(#admin-q-#{raised_question.id} button[phx-click="mark_asked"]))
+      |> render_click()
+
+      refute has_element?(view, "#raised-questions-feed #admin-q-#{raised_question.id}")
+
+      view |> element("#admin-tab-asked") |> render_click()
+
+      assert has_element?(view, "#asked-questions-feed #admin-q-#{raised_question.id}")
+    end
+
+    test "moving an asked question back to raised returns it to the raised tab", %{
+      conn: conn,
+      owner: owner,
+      room: room,
+      asked_question: asked_question
+    } do
+      view = open_room(conn, owner, room.slug, "?tab=asked")
+
+      assert has_element?(view, "#asked-questions-feed #admin-q-#{asked_question.id}")
+
+      view
+      |> element(~s(#admin-q-#{asked_question.id} button[phx-click="mark_unasked"]))
+      |> render_click()
+
+      refute has_element?(view, "#asked-questions-feed #admin-q-#{asked_question.id}")
+
+      view |> element("#admin-tab-raised") |> render_click()
+
+      assert has_element?(view, "#raised-questions-feed #admin-q-#{asked_question.id}")
     end
   end
 end

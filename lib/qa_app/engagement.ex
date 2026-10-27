@@ -9,15 +9,27 @@ defmodule QaApp.Engagement do
   alias QaApp.Events.Room
 
   def list_active_questions(room_id) do
-    Question
-    |> where([q], q.room_id == ^room_id and q.is_asked == false)
-    |> order_by([q], desc: q.vote_count, desc: q.inserted_at)
-    |> Repo.all()
+    list_questions_by_asked(room_id, false)
+  end
+
+  def list_raised_questions(room_id) do
+    list_questions_by_asked(room_id, false)
+  end
+
+  def list_asked_questions(room_id) do
+    list_questions_by_asked(room_id, true)
   end
 
   def list_all_questions(room_id) do
     Question
     |> where([q], q.room_id == ^room_id)
+    |> order_by([q], desc: q.vote_count, desc: q.inserted_at)
+    |> Repo.all()
+  end
+
+  defp list_questions_by_asked(room_id, is_asked) do
+    Question
+    |> where([q], q.room_id == ^room_id and q.is_asked == ^is_asked)
     |> order_by([q], desc: q.vote_count, desc: q.inserted_at)
     |> Repo.all()
   end
@@ -49,8 +61,16 @@ defmodule QaApp.Engagement do
   end
 
   def mark_as_asked(%Question{} = question) do
+    update_asked_state(question, true)
+  end
+
+  def mark_as_unasked(%Question{} = question) do
+    update_asked_state(question, false)
+  end
+
+  defp update_asked_state(%Question{} = question, is_asked) do
     question
-    |> Question.changeset(%{is_asked: true})
+    |> Question.changeset(%{is_asked: is_asked})
     |> Repo.update()
     |> case do
       {:ok, updated_question} ->
