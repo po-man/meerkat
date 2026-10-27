@@ -267,11 +267,11 @@ defmodule QaAppWeb.AudienceLive.Show do
 
         <!-- Live Audience Questions Feed -->
         <section class="mt-14">
-          <div class="flex items-baseline justify-between gap-4 pb-3 border-b border-line">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 pb-3 border-b border-line">
             <h2 class="text-lg font-semibold tracking-[-0.01em] text-ink">
               Audience Questions
             </h2>
-            <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
+            <span class="w-full sm:w-auto font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
               {length(@questions)} open · Sorted by votes
             </span>
           </div>

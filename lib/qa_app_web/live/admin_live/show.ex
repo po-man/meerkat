@@ -116,7 +116,7 @@ defmodule QaAppWeb.AdminLive.Show do
 
         <!-- Live Moderation Question Feed -->
         <section class="mt-10">
-          <div class="flex items-baseline justify-between gap-4 pb-3 border-b border-line">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 pb-3 border-b border-line">
             <div id="admin-tabs" class="flex items-center gap-1 sm:gap-2">
               <.link
                 id="admin-tab-raised"
@@ -163,7 +163,7 @@ defmodule QaAppWeb.AdminLive.Show do
               </.link>
             </div>
 
-            <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
+            <span class="w-full sm:w-auto font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
               {if(@tab == :raised, do: length(@raised_questions), else: length(@asked_questions))} total · Sorted by votes
             </span>
           </div>
