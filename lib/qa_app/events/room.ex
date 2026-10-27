@@ -36,7 +36,7 @@ defmodule QaApp.Events.Room do
     field :expires_at, :utc_datetime
     field :expires_in, :string, virtual: true
 
-    belongs_to :admin, QaApp.Accounts.User, foreign_key: :admin_id, type: :binary_id
+    belongs_to :moderator, QaApp.Accounts.User, foreign_key: :moderator_id, type: :binary_id
     has_many :questions, QaApp.Engagement.Question, foreign_key: :room_id
 
     timestamps(type: :utc_datetime)
@@ -51,7 +51,7 @@ defmodule QaApp.Events.Room do
   """
   def changeset(room, attrs) do
     room
-    |> cast(attrs, [:slug, :title, :intro_text, :char_limit, :is_active, :admin_id])
+    |> cast(attrs, [:slug, :title, :intro_text, :char_limit, :is_active, :moderator_id])
     |> validate_required([:slug, :title, :char_limit, :is_active])
     |> validate_number(:char_limit, greater_than: 0, less_than_or_equal_to: 1000)
     |> validate_format(:slug, ~r/^[a-z0-9\-]+$/,

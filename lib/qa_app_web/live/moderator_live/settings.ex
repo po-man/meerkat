@@ -1,4 +1,4 @@
-defmodule QaAppWeb.AdminLive.Settings do
+defmodule QaAppWeb.ModeratorLive.Settings do
   use QaAppWeb, :live_view
 
   alias QaApp.Events
@@ -14,7 +14,7 @@ defmodule QaAppWeb.AdminLive.Settings do
       room ->
         current_user = socket.assigns[:current_user]
 
-        if current_user && (current_user.role == :super_admin || current_user.id == room.admin_id) do
+        if current_user && (current_user.role == :admin || current_user.id == room.moderator_id) do
           if connected?(socket) do
             Events.subscribe_room(room.id)
           end
@@ -83,7 +83,7 @@ defmodule QaAppWeb.AdminLive.Settings do
 
             <div class="flex items-center gap-3">
               <.link
-                href={~p"/admin/r/#{@room.slug}/export.csv"}
+                href={~p"/moderator/r/#{@room.slug}/export.csv"}
                 target="_blank"
                 class="inline-flex items-center gap-2 h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
               >

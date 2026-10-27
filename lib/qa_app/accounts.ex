@@ -1,6 +1,6 @@
 defmodule QaApp.Accounts do
   @moduledoc """
-  The Accounts context for managing Super Admins and Room Admins.
+  The Accounts context for managing Admins and Moderators.
   """
 
   import Ecto.Query, warn: false
@@ -17,11 +17,11 @@ defmodule QaApp.Accounts do
     Repo.get_by(User, username: username)
   end
 
-  def create_super_admin(attrs) do
+  def create_admin(attrs) do
     attrs_map =
       case attrs do
-        %{} -> Map.put(attrs, "role", :super_admin)
-        _ -> %{"role" => :super_admin}
+        %{} -> Map.put(attrs, "role", :admin)
+        _ -> %{"role" => :admin}
       end
 
     %User{}
@@ -29,10 +29,10 @@ defmodule QaApp.Accounts do
     |> Repo.insert()
   end
 
-  def create_room_admin(attrs) do
+  def create_moderator(attrs) do
     attrs_with_defaults =
       attrs
-      |> Map.put("role", :room_admin)
+      |> Map.put("role", :moderator)
       |> Map.put_new("must_change_password", true)
 
     %User{}
@@ -60,7 +60,7 @@ defmodule QaApp.Accounts do
     end
   end
 
-  def super_admin_exists? do
-    Repo.exists?(from u in User, where: u.role == :super_admin)
+  def admin_exists? do
+    Repo.exists?(from u in User, where: u.role == :admin)
   end
 end

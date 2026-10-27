@@ -1,4 +1,4 @@
-defmodule QaAppWeb.SuperAdminLiveIndexTest do
+defmodule QaAppWeb.AdminLiveIndexTest do
   use QaAppWeb.ConnCase
 
   import Phoenix.LiveViewTest
@@ -10,8 +10,8 @@ defmodule QaAppWeb.SuperAdminLiveIndexTest do
   @secret_path AdminAuth.secret_path()
 
   setup do
-    {:ok, _} = Accounts.create_super_admin(%{"username" => "root", "password" => "secret123"})
-    {:ok, _} = Accounts.create_room_admin(%{"username" => "mod", "password" => "secret123"})
+    {:ok, _} = Accounts.create_admin(%{"username" => "root", "password" => "secret123"})
+    {:ok, _} = Accounts.create_moderator(%{"username" => "mod", "password" => "secret123"})
     :ok
   end
 
@@ -19,15 +19,15 @@ defmodule QaAppWeb.SuperAdminLiveIndexTest do
     post(conn, @secret_path, %{"username" => username, "password" => "secret123"})
   end
 
-  defp open_super_admin(conn) do
+  defp open_admin(conn) do
     conn = login_as(conn, "root")
-    {:ok, view, _html} = live(conn, "/super-admin")
+    {:ok, view, _html} = live(conn, "/admin")
     view
   end
 
   describe "creating a room with an expiry" do
     setup %{conn: conn} do
-      view = open_super_admin(conn)
+      view = open_admin(conn)
       view |> element(~s(button[phx-click="open_create_room"])) |> render_click()
       {:ok, view: view}
     end
@@ -46,7 +46,7 @@ defmodule QaAppWeb.SuperAdminLiveIndexTest do
         room: %{
           "slug" => "expiry-room",
           "title" => "Expiry Room",
-          "admin_id" => "",
+          "moderator_id" => "",
           "char_limit" => "320",
           "expires_in" => "7 days"
         }
@@ -69,7 +69,7 @@ defmodule QaAppWeb.SuperAdminLiveIndexTest do
           "room" => %{
             "slug" => "invalid-expiry-room",
             "title" => "Invalid Expiry Room",
-            "admin_id" => "",
+            "moderator_id" => "",
             "char_limit" => "320",
             "expires_in" => "2 weeks"
           }
@@ -97,7 +97,7 @@ defmodule QaAppWeb.SuperAdminLiveIndexTest do
       conn: conn,
       room: room
     } do
-      view = open_super_admin(conn)
+      view = open_admin(conn)
 
       assert render(view) =~ "Expires"
       assert render(view) =~ Calendar.strftime(room.expires_at, "%b %d, %Y")
@@ -121,7 +121,7 @@ defmodule QaAppWeb.SuperAdminLiveIndexTest do
           "expires_in" => "3 minutes"
         })
 
-      view = open_super_admin(conn)
+      view = open_admin(conn)
 
       assert render(view) =~ "Expires Soon"
 

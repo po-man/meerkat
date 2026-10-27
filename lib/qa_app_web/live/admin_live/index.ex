@@ -1,4 +1,4 @@
-defmodule QaAppWeb.SuperAdminLive.Index do
+defmodule QaAppWeb.AdminLive.Index do
   use QaAppWeb, :live_view
 
   alias QaApp.Events
@@ -8,7 +8,7 @@ defmodule QaAppWeb.SuperAdminLive.Index do
   def mount(_params, _session, socket) do
     rooms = Events.list_rooms()
     users = Accounts.list_users()
-    room_admins = Enum.filter(users, fn u -> u.role == :room_admin end)
+    moderators = Enum.filter(users, fn u -> u.role == :moderator end)
 
     if connected?(socket) do
       Events.subscribe_rooms()
@@ -20,15 +20,15 @@ defmodule QaAppWeb.SuperAdminLive.Index do
      socket
      |> assign(:rooms, rooms)
      |> assign(:users, users)
-     |> assign(:room_admins, room_admins)
+     |> assign(:moderators, moderators)
      |> assign(:room_form, room_form)
      |> assign(:editing_room, nil)
      |> assign(:edit_room_form, nil)
      |> assign(:show_create_room_modal?, false)
-     |> assign(:show_create_admin_modal?, false)
+     |> assign(:show_create_moderator_modal?, false)
      |> assign(:show_configure_room_modal?, false)
-     |> assign(:admin_username, "")
-     |> assign(:admin_password, "")}
+     |> assign(:moderator_username, "")
+     |> assign(:moderator_password, "")}
   end
 
   def handle_info({:room_expired, _room_id}, socket) do
@@ -62,17 +62,19 @@ defmodule QaAppWeb.SuperAdminLive.Index do
      |> assign(:edit_room_form, nil)}
   end
 
-  def handle_event("open_create_admin", _, socket) do
-    {:noreply, assign(socket, :show_create_admin_modal?, true)}
+  def handle_event("open_create_moderator", _, socket) do
+    {:noreply, assign(socket, :show_create_moderator_modal?, true)}
   end
 
-  def handle_event("close_create_admin", _, socket) do
-    {:noreply, assign(socket, :show_create_admin_modal?, false)}
+  def handle_event("close_create_moderator", _, socket) do
+    {:noreply, assign(socket, :show_create_moderator_modal?, false)}
   end
 
   def handle_event("create_room", %{"room" => room_params}, socket) do
     room_params =
-      if room_params["admin_id"] == "", do: Map.delete(room_params, "admin_id"), else: room_params
+      if room_params["moderator_id"] == "",
+        do: Map.delete(room_params, "moderator_id"),
+        else: room_params
 
     case Events.create_room(room_params) do
       {:ok, _room} ->
@@ -94,8 +96,8 @@ defmodule QaAppWeb.SuperAdminLive.Index do
     room = socket.assigns.editing_room
 
     room_params =
-      if room_params["admin_id"] == "",
-        do: Map.put(room_params, "admin_id", nil),
+      if room_params["moderator_id"] == "",
+        do: Map.put(room_params, "moderator_id", nil),
         else: room_params
 
     case Events.update_room(room, room_params) do
@@ -116,24 +118,24 @@ defmodule QaAppWeb.SuperAdminLive.Index do
   end
 
   def handle_event(
-        "create_room_admin",
-        %{"admin" => %{"username" => username, "password" => password}},
+        "create_moderator",
+        %{"moderator" => %{"username" => username, "password" => password}},
         socket
       ) do
-    case Accounts.create_room_admin(%{"username" => username, "password" => password}) do
-      {:ok, _admin} ->
+    case Accounts.create_moderator(%{"username" => username, "password" => password}) do
+      {:ok, _moderator} ->
         users = Accounts.list_users()
-        room_admins = Enum.filter(users, fn u -> u.role == :room_admin end)
+        moderators = Enum.filter(users, fn u -> u.role == :moderator end)
 
         {:noreply,
          socket
          |> assign(:users, users)
-         |> assign(:room_admins, room_admins)
-         |> assign(:show_create_admin_modal?, false)
-         |> put_flash(:info, "Room Admin account created successfully.")}
+         |> assign(:moderators, moderators)
+         |> assign(:show_create_moderator_modal?, false)
+         |> put_flash(:info, "Moderator account created successfully.")}
 
       {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to create Room Admin account.")}
+        {:noreply, put_flash(socket, :error, "Failed to create Moderator account.")}
     end
   end
 
@@ -161,19 +163,19 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                 <span class="w-2 h-2 bg-accent"></span> System
               </p>
               <h1 class="mt-4 text-3xl sm:text-4xl font-semibold tracking-[-0.03em] leading-[1.05] text-ink">
-                Super Admin Control Center
+                Admin Control Center
               </h1>
               <p class="mt-2 text-sm text-ink-2">
-                Manage system rooms, administrators, and event routing.
+                Manage system rooms, moderators, and event routing.
               </p>
             </div>
 
             <div class="flex items-center gap-3">
               <button
-                phx-click="open_create_admin"
+                phx-click="open_create_moderator"
                 class="inline-flex items-center gap-2 h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
               >
-                <.icon name="hero-user-plus" class="size-4" /> Add Room Admin
+                <.icon name="hero-user-plus" class="size-4" /> Add Moderator
               </button>
 
               <button
@@ -203,7 +205,7 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                     Title / Slug
                   </th>
                   <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
-                    Assigned Admin
+                    Assigned Moderator
                   </th>
                   <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
                     Character Limit
@@ -224,8 +226,8 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                       <div class="mt-0.5 font-mono text-xs text-ink-3">/r/{room.slug}</div>
                     </td>
                     <td class="py-4 pr-4 align-top">
-                      <%= if room.admin do %>
-                        <span class="font-mono text-xs text-ink-2">{room.admin.username}</span>
+                      <%= if room.moderator do %>
+                        <span class="font-mono text-xs text-ink-2">{room.moderator.username}</span>
                       <% else %>
                         <span class="font-mono text-xs text-ink-3">Unassigned</span>
                       <% end %>
@@ -246,7 +248,7 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                           Configure
                         </button>
                         <.link
-                          navigate={~p"/admin/r/#{room.slug}"}
+                          navigate={~p"/moderator/r/#{room.slug}"}
                           class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors underline-offset-4 hover:underline"
                         >
                           Moderate
@@ -306,20 +308,23 @@ defmodule QaAppWeb.SuperAdminLive.Index do
 
                 <div>
                   <label
-                    for="configure-room-admin"
+                    for="configure-room-moderator"
                     class="block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 mb-2"
                   >
-                    Assigned Room Admin
+                    Assigned Moderator
                   </label>
                   <select
-                    id="configure-room-admin"
-                    name="room[admin_id]"
+                    id="configure-room-moderator"
+                    name="room[moderator_id]"
                     class="w-full h-10 px-3 rounded bg-transparent border border-line-strong text-sm text-ink focus:outline-none focus:border-ink transition-colors"
                   >
-                    <option value="">Select Room Admin (Unassigned)...</option>
-                    <%= for admin <- @room_admins do %>
-                      <option value={admin.id} selected={@edit_room_form[:admin_id].value == admin.id}>
-                        {admin.username}
+                    <option value="">Select Moderator (Unassigned)...</option>
+                    <%= for moderator <- @moderators do %>
+                      <option
+                        value={moderator.id}
+                        selected={@edit_room_form[:moderator_id].value == moderator.id}
+                      >
+                        {moderator.username}
                       </option>
                     <% end %>
                   </select>
@@ -398,19 +403,19 @@ defmodule QaAppWeb.SuperAdminLive.Index do
 
                 <div>
                   <label
-                    for="create-room-admin"
+                    for="create-room-moderator"
                     class="block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 mb-2"
                   >
-                    Assign Room Admin
+                    Assign Moderator
                   </label>
                   <select
-                    id="create-room-admin"
-                    name="room[admin_id]"
+                    id="create-room-moderator"
+                    name="room[moderator_id]"
                     class="w-full h-10 px-3 rounded bg-transparent border border-line-strong text-sm text-ink focus:outline-none focus:border-ink transition-colors"
                   >
-                    <option value="">Select Room Admin...</option>
-                    <%= for admin <- @room_admins do %>
-                      <option value={admin.id}>{admin.username}</option>
+                    <option value="">Select Moderator...</option>
+                    <%= for moderator <- @moderators do %>
+                      <option value={moderator.id}>{moderator.username}</option>
                     <% end %>
                   </select>
                 </div>
@@ -450,12 +455,12 @@ defmodule QaAppWeb.SuperAdminLive.Index do
           </div>
         <% end %>
 
-        <!-- Create Admin Modal -->
-        <%= if @show_create_admin_modal? do %>
+        <!-- Create Moderator Modal -->
+        <%= if @show_create_moderator_modal? do %>
           <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
             <div class="bg-paper border border-line-strong rounded-lg p-6 sm:p-8 max-w-md w-full space-y-5 relative">
               <button
-                phx-click="close_create_admin"
+                phx-click="close_create_moderator"
                 aria-label="Close"
                 class="absolute top-3 right-3 w-9 h-9 rounded border border-transparent hover:border-line-strong flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
               >
@@ -464,17 +469,17 @@ defmodule QaAppWeb.SuperAdminLive.Index do
 
               <div>
                 <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                  Add Administrator
+                  Add Moderator
                 </p>
                 <h3 class="mt-2 text-xl font-semibold tracking-[-0.02em] text-ink">
-                  Room Admin Account
+                  Moderator Account
                 </h3>
               </div>
 
-              <.form :let={f} for={%{}} action="#" phx-submit="create_room_admin" class="space-y-4">
+              <.form :let={f} for={%{}} action="#" phx-submit="create_moderator" class="space-y-4">
                 <.input
                   field={f[:username]}
-                  name="admin[username]"
+                  name="moderator[username]"
                   type="text"
                   required
                   label="Username"
@@ -482,7 +487,7 @@ defmodule QaAppWeb.SuperAdminLive.Index do
 
                 <.input
                   field={f[:password]}
-                  name="admin[password]"
+                  name="moderator[password]"
                   type="password"
                   required
                   label="Initial Password"
@@ -491,7 +496,7 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                 <div class="flex items-center justify-end gap-3 pt-2">
                   <button
                     type="button"
-                    phx-click="close_create_admin"
+                    phx-click="close_create_moderator"
                     class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
                   >
                     Cancel

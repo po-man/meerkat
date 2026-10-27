@@ -8,14 +8,14 @@ defmodule QaAppWeb.SessionControllerTest do
   @access_code "test-access-code"
 
   setup do
-    previous = System.get_env("SUPER_ADMIN_ACCESS_CODE")
+    previous = System.get_env("ADMIN_ACCESS_CODE")
 
-    System.put_env("SUPER_ADMIN_ACCESS_CODE", @access_code)
+    System.put_env("ADMIN_ACCESS_CODE", @access_code)
 
     on_exit(fn ->
       case previous do
-        nil -> System.delete_env("SUPER_ADMIN_ACCESS_CODE")
-        _ -> System.put_env("SUPER_ADMIN_ACCESS_CODE", previous)
+        nil -> System.delete_env("ADMIN_ACCESS_CODE")
+        _ -> System.put_env("ADMIN_ACCESS_CODE", previous)
       end
     end)
 
@@ -23,19 +23,19 @@ defmodule QaAppWeb.SessionControllerTest do
   end
 
   describe "GET secret sign-in page" do
-    test "shows the first-time setup form when no super admin exists", %{conn: conn} do
-      refute Accounts.super_admin_exists?()
+    test "shows the first-time setup form when no admin exists", %{conn: conn} do
+      refute Accounts.admin_exists?()
 
       conn = get(conn, @secret_path)
 
       html = html_response(conn, 200)
-      assert html =~ "Super Admin Setup"
+      assert html =~ "Admin Setup"
       assert html =~ "Access Code"
       assert html =~ ~s(action="#{@secret_path}")
     end
 
-    test "shows only username and password when a super admin exists", %{conn: conn} do
-      {:ok, _} = Accounts.create_super_admin(%{"username" => "root", "password" => "secret123"})
+    test "shows only username and password when an admin exists", %{conn: conn} do
+      {:ok, _} = Accounts.create_admin(%{"username" => "root", "password" => "secret123"})
 
       conn = get(conn, @secret_path)
 
@@ -46,25 +46,25 @@ defmodule QaAppWeb.SessionControllerTest do
       refute html =~ "Access Code"
     end
 
-    test "redirects an already signed-in room admin to the admin dashboard", %{conn: conn} do
-      {:ok, _} = Accounts.create_super_admin(%{"username" => "root", "password" => "secret123"})
-      {:ok, _} = Accounts.create_room_admin(%{"username" => "mod", "password" => "secret123"})
+    test "redirects an already signed-in moderator to the moderator dashboard", %{conn: conn} do
+      {:ok, _} = Accounts.create_admin(%{"username" => "root", "password" => "secret123"})
+      {:ok, _} = Accounts.create_moderator(%{"username" => "mod", "password" => "secret123"})
 
       conn = post(conn, @secret_path, %{"username" => "mod", "password" => "secret123"})
-      assert redirected_to(conn) == "/admin/dashboard"
+      assert redirected_to(conn) == "/moderator/dashboard"
 
       conn = get(conn, @secret_path)
-      assert redirected_to(conn) == "/admin/dashboard"
+      assert redirected_to(conn) == "/moderator/dashboard"
     end
 
-    test "redirects an already signed-in super admin to the super admin dashboard", %{conn: conn} do
-      {:ok, _} = Accounts.create_super_admin(%{"username" => "root", "password" => "secret123"})
+    test "redirects an already signed-in admin to the admin dashboard", %{conn: conn} do
+      {:ok, _} = Accounts.create_admin(%{"username" => "root", "password" => "secret123"})
 
       conn = post(conn, @secret_path, %{"username" => "root", "password" => "secret123"})
-      assert redirected_to(conn) == "/super-admin"
+      assert redirected_to(conn) == "/admin"
 
       conn = get(conn, @secret_path)
-      assert redirected_to(conn) == "/super-admin"
+      assert redirected_to(conn) == "/admin"
     end
   end
 
@@ -73,26 +73,26 @@ defmodule QaAppWeb.SessionControllerTest do
       conn =
         post(conn, @secret_path, %{
           "access_code" => "wrong-code",
-          "username" => "superadmin",
+          "username" => "admin",
           "password" => "secret123"
         })
 
       assert html_response(conn, 200) =~ "Invalid access code"
-      refute Accounts.super_admin_exists?()
+      refute Accounts.admin_exists?()
     end
 
-    test "creates the super admin and signs them in", %{conn: conn} do
+    test "creates the admin and signs them in", %{conn: conn} do
       conn =
         post(conn, @secret_path, %{
           "access_code" => @access_code,
-          "username" => "superadmin",
+          "username" => "admin",
           "password" => "secret123"
         })
 
-      assert redirected_to(conn) == "/super-admin"
+      assert redirected_to(conn) == "/admin"
 
-      assert %{} = user = Accounts.get_user_by_username("superadmin")
-      assert user.role == :super_admin
+      assert %{} = user = Accounts.get_user_by_username("admin")
+      assert user.role == :admin
       assert get_session(conn, :user_id) == user.id
     end
 
@@ -105,25 +105,25 @@ defmodule QaAppWeb.SessionControllerTest do
         })
 
       assert html_response(conn, 200) =~ "Validation error"
-      refute Accounts.super_admin_exists?()
+      refute Accounts.admin_exists?()
     end
   end
 
   describe "POST secret sign-in page (login)" do
     setup do
-      {:ok, _} = Accounts.create_super_admin(%{"username" => "root", "password" => "secret123"})
-      {:ok, _} = Accounts.create_room_admin(%{"username" => "mod", "password" => "secret123"})
+      {:ok, _} = Accounts.create_admin(%{"username" => "root", "password" => "secret123"})
+      {:ok, _} = Accounts.create_moderator(%{"username" => "mod", "password" => "secret123"})
       :ok
     end
 
-    test "logs a super admin in and redirects to the super admin dashboard", %{conn: conn} do
+    test "logs an admin in and redirects to the admin dashboard", %{conn: conn} do
       conn = post(conn, @secret_path, %{"username" => "root", "password" => "secret123"})
-      assert redirected_to(conn) == "/super-admin"
+      assert redirected_to(conn) == "/admin"
     end
 
-    test "logs a room admin in and redirects to the admin dashboard", %{conn: conn} do
+    test "logs a moderator in and redirects to the moderator dashboard", %{conn: conn} do
       conn = post(conn, @secret_path, %{"username" => "mod", "password" => "secret123"})
-      assert redirected_to(conn) == "/admin/dashboard"
+      assert redirected_to(conn) == "/moderator/dashboard"
     end
 
     test "rejects invalid credentials", %{conn: conn} do
@@ -134,30 +134,30 @@ defmodule QaAppWeb.SessionControllerTest do
 
   describe "DELETE /logout" do
     setup do
-      {:ok, _} = Accounts.create_super_admin(%{"username" => "root", "password" => "secret123"})
-      {:ok, _} = Accounts.create_room_admin(%{"username" => "mod", "password" => "secret123"})
+      {:ok, _} = Accounts.create_admin(%{"username" => "root", "password" => "secret123"})
+      {:ok, _} = Accounts.create_moderator(%{"username" => "mod", "password" => "secret123"})
       :ok
     end
 
-    test "clears the signed-in state of a room admin", %{conn: conn} do
+    test "clears the signed-in state of a moderator", %{conn: conn} do
       conn = post(conn, @secret_path, %{"username" => "mod", "password" => "secret123"})
-      assert redirected_to(conn) == "/admin/dashboard"
+      assert redirected_to(conn) == "/moderator/dashboard"
 
       conn = delete(conn, "/logout")
       assert redirected_to(conn) == "/"
 
       # the session is gone: protected pages redirect to the sign-in page again
-      assert redirected_to(get(conn, "/admin/dashboard")) == @secret_path
+      assert redirected_to(get(conn, "/moderator/dashboard")) == @secret_path
     end
 
-    test "clears the signed-in state of a super admin", %{conn: conn} do
+    test "clears the signed-in state of an admin", %{conn: conn} do
       conn = post(conn, @secret_path, %{"username" => "root", "password" => "secret123"})
-      assert redirected_to(conn) == "/super-admin"
+      assert redirected_to(conn) == "/admin"
 
       conn = delete(conn, "/logout")
       assert redirected_to(conn) == "/"
 
-      assert redirected_to(get(conn, "/super-admin")) == @secret_path
+      assert redirected_to(get(conn, "/admin")) == @secret_path
     end
   end
 

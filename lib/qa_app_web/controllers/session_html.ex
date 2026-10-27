@@ -13,12 +13,12 @@ defmodule QaAppWeb.SessionHTML do
             </p>
 
             <h2 class="mt-6 text-3xl sm:text-4xl font-semibold tracking-[-0.03em] text-ink">
-              {if @setup_mode, do: "Super Admin Setup", else: "Admin Portal"}
+              {if @setup_mode, do: "Admin Setup", else: "Admin Portal"}
             </h2>
 
             <p class="mt-3 text-sm leading-relaxed text-ink-2">
               {if @setup_mode,
-                do: "First-time setup. Enter the access code to initialize the super admin account.",
+                do: "First-time setup. Enter the access code to initialize the admin account.",
                 else: "Sign in to manage your Q&A events"}
             </p>
 
@@ -36,7 +36,7 @@ defmodule QaAppWeb.SessionHTML do
                     type="password"
                     required
                     label="Access Code"
-                    placeholder="SUPER_ADMIN_ACCESS_CODE"
+                    placeholder="ADMIN_ACCESS_CODE"
                   />
                 </div>
               <% end %>
@@ -47,7 +47,7 @@ defmodule QaAppWeb.SessionHTML do
                   type="text"
                   required
                   label="Username"
-                  placeholder={if @setup_mode, do: "superadmin", else: "admin"}
+                  placeholder={if @setup_mode, do: "admin", else: "moderator"}
                 />
               </div>
 

@@ -7,13 +7,13 @@ defmodule QaAppWeb.SessionController do
   # Renders the combined sign-in page.
   #
   # * Already signed in  -> redirect to the user's own dashboard
-  # * No super admin yet -> first-time setup form (access code + credentials)
-  # * Super admin exists -> plain username/password form
+  # * No admin yet       -> first-time setup form (access code + credentials)
+  # * Admin exists       -> plain username/password form
   def new(conn, _params) do
     case conn.assigns[:current_user] do
       nil ->
         render(conn, :new,
-          setup_mode: !Accounts.super_admin_exists?(),
+          setup_mode: !Accounts.admin_exists?(),
           login_path: AdminAuth.secret_path(),
           error_message: nil
         )
@@ -26,10 +26,10 @@ defmodule QaAppWeb.SessionController do
   end
 
   def create(conn, params) do
-    if Accounts.super_admin_exists?() do
+    if Accounts.admin_exists?() do
       authenticate(conn, params)
     else
-      create_super_admin(conn, params)
+      create_admin(conn, params)
     end
   end
 
@@ -49,9 +49,9 @@ defmodule QaAppWeb.SessionController do
     end
   end
 
-  defp create_super_admin(conn, params) do
+  defp create_admin(conn, params) do
     access_code = param(params, "access_code")
-    expected_code = System.get_env("SUPER_ADMIN_ACCESS_CODE") || "secret123"
+    expected_code = System.get_env("ADMIN_ACCESS_CODE") || "secret123"
 
     if access_code && access_code == expected_code do
       attrs = %{
@@ -59,10 +59,10 @@ defmodule QaAppWeb.SessionController do
         "password" => param(params, "password")
       }
 
-      case Accounts.create_super_admin(attrs) do
+      case Accounts.create_admin(attrs) do
         {:ok, user} ->
           conn
-          |> put_flash(:info, "Super Admin account created. Welcome, #{user.username}!")
+          |> put_flash(:info, "Admin account created. Welcome, #{user.username}!")
           |> QaAppWeb.UserAuth.log_in_user(user)
           |> redirect(to: AdminAuth.dashboard_path(user))
 

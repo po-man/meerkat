@@ -1,8 +1,8 @@
 defmodule QaAppWeb.ExportControllerTest do
   use QaAppWeb.ConnCase
 
-  test "GET /admin/r/:slug/qr.png returns a valid PNG image", %{conn: conn} do
-    conn = get(conn, ~p"/admin/r/my-room/qr.png")
+  test "GET /moderator/r/:slug/qr.png returns a valid PNG image", %{conn: conn} do
+    conn = get(conn, ~p"/moderator/r/my-room/qr.png")
 
     assert conn.status == 200
     assert response_content_type(conn, :png)

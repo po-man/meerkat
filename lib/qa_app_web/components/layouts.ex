@@ -147,7 +147,7 @@ defmodule QaAppWeb.Layouts do
     >
       <.link
         id="room-tab-questions"
-        navigate={~p"/admin/r/#{@room.slug}"}
+        navigate={~p"/moderator/r/#{@room.slug}"}
         class={[
           "inline-flex items-center h-10 px-3 sm:px-4 -mb-px border-b-2 transition-colors duration-150",
           if(@active == :questions,
@@ -161,7 +161,7 @@ defmodule QaAppWeb.Layouts do
 
       <.link
         id="room-tab-settings"
-        navigate={~p"/admin/r/#{@room.slug}/settings"}
+        navigate={~p"/moderator/r/#{@room.slug}/settings"}
         class={[
           "inline-flex items-center h-10 px-3 sm:px-4 -mb-px border-b-2 transition-colors duration-150",
           if(@active == :settings,

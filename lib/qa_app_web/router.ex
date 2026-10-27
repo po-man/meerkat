@@ -40,25 +40,25 @@ defmodule QaAppWeb.Router do
     end
   end
 
-  # Room Admin LiveView Routes
-  live_session :admin, on_mount: [{QaAppWeb.UserAuth, :require_authenticated_user}] do
+  # Admin LiveView Routes
+  live_session :admin, on_mount: [{QaAppWeb.UserAuth, :require_admin}] do
     scope "/admin", QaAppWeb do
       pipe_through :browser
 
-      live "/dashboard", AdminLive.Dashboard, :index
-      live "/r/:slug/settings", AdminLive.Settings, :settings
-      live "/r/:slug", AdminLive.Show, :show
-      get "/r/:slug/export.csv", ExportController, :csv
-      get "/r/:slug/qr.png", ExportController, :qr
+      live "/", AdminLive.Index, :index
     end
   end
 
-  # Super Admin LiveView Routes
-  live_session :super_admin, on_mount: [{QaAppWeb.UserAuth, :require_super_admin}] do
-    scope "/super-admin", QaAppWeb do
+  # Moderator LiveView Routes
+  live_session :moderator, on_mount: [{QaAppWeb.UserAuth, :require_authenticated_user}] do
+    scope "/moderator", QaAppWeb do
       pipe_through :browser
 
-      live "/", SuperAdminLive.Index, :index
+      live "/dashboard", ModeratorLive.Dashboard, :index
+      live "/r/:slug/settings", ModeratorLive.Settings, :settings
+      live "/r/:slug", ModeratorLive.Show, :show
+      get "/r/:slug/export.csv", ExportController, :csv
+      get "/r/:slug/qr.png", ExportController, :qr
     end
   end
 

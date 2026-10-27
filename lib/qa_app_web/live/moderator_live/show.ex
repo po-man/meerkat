@@ -1,4 +1,4 @@
-defmodule QaAppWeb.AdminLive.Show do
+defmodule QaAppWeb.ModeratorLive.Show do
   use QaAppWeb, :live_view
 
   alias QaApp.Events
@@ -15,7 +15,7 @@ defmodule QaAppWeb.AdminLive.Show do
       room ->
         current_user = socket.assigns[:current_user]
 
-        if current_user && (current_user.role == :super_admin || current_user.id == room.admin_id) do
+        if current_user && (current_user.role == :admin || current_user.id == room.moderator_id) do
           if connected?(socket) do
             Events.subscribe_room(room.id)
           end
@@ -117,10 +117,10 @@ defmodule QaAppWeb.AdminLive.Show do
         <!-- Live Moderation Question Feed -->
         <section class="mt-10">
           <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 pb-3 border-b border-line">
-            <div id="admin-tabs" class="flex items-center gap-1 sm:gap-2">
+            <div id="moderator-tabs" class="flex items-center gap-1 sm:gap-2">
               <.link
-                id="admin-tab-raised"
-                patch={~p"/admin/r/#{@room.slug}?tab=raised"}
+                id="moderator-tab-raised"
+                patch={~p"/moderator/r/#{@room.slug}?tab=raised"}
                 class={[
                   "inline-flex items-center gap-2 h-9 px-3 sm:px-4 rounded transition-colors duration-150",
                   if(@tab == :raised,
@@ -141,8 +141,8 @@ defmodule QaAppWeb.AdminLive.Show do
               </.link>
 
               <.link
-                id="admin-tab-asked"
-                patch={~p"/admin/r/#{@room.slug}?tab=asked"}
+                id="moderator-tab-asked"
+                patch={~p"/moderator/r/#{@room.slug}?tab=asked"}
                 class={[
                   "inline-flex items-center gap-2 h-9 px-3 sm:px-4 rounded transition-colors duration-150",
                   if(@tab == :asked,
@@ -168,7 +168,7 @@ defmodule QaAppWeb.AdminLive.Show do
             </span>
           </div>
 
-          <div id="admin-questions-feed">
+          <div id="moderator-questions-feed">
             <%= if @tab == :raised do %>
               <div id="raised-questions-feed">
                 <%= if Enum.empty?(@raised_questions) do %>
@@ -183,7 +183,7 @@ defmodule QaAppWeb.AdminLive.Show do
                 <% else %>
                   <%= for {question, i} <- Enum.with_index(@raised_questions) do %>
                     <div
-                      id={"admin-q-#{question.id}"}
+                      id={"moderator-q-#{question.id}"}
                       class="grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-5 border-b border-line"
                     >
                       <div class="col-span-1 sm:col-span-1">
@@ -235,7 +235,7 @@ defmodule QaAppWeb.AdminLive.Show do
                 <% else %>
                   <%= for {question, i} <- Enum.with_index(@asked_questions) do %>
                     <div
-                      id={"admin-q-#{question.id}"}
+                      id={"moderator-q-#{question.id}"}
                       class="grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-5 border-b border-line"
                     >
                       <div class="col-span-2 sm:col-span-1">
@@ -301,7 +301,11 @@ defmodule QaAppWeb.AdminLive.Show do
               <p class="mt-1 font-mono text-xs text-ink-3 break-all">/r/{@room.slug}</p>
 
               <div class="mt-6 inline-block bg-white p-4 border border-line-strong rounded">
-                <img src={~p"/admin/r/#{@room.slug}/qr.png"} alt="QR Code" class="w-44 h-44 mx-auto" />
+                <img
+                  src={~p"/moderator/r/#{@room.slug}/qr.png"}
+                  alt="QR Code"
+                  class="w-44 h-44 mx-auto"
+                />
               </div>
 
               <div class="mt-5">

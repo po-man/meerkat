@@ -34,16 +34,16 @@ defmodule QaAppWeb.UserAuth do
     end
   end
 
-  def require_super_admin(conn, _opts) do
+  def require_admin(conn, _opts) do
     user = conn.assigns[:current_user]
 
     cond do
-      user && user.role == :super_admin ->
+      user && user.role == :admin ->
         conn
 
       user ->
         conn
-        |> put_flash(:error, "Access denied. Super Admin privileges required.")
+        |> put_flash(:error, "Access denied. Admin privileges required.")
         |> redirect(to: AdminAuth.dashboard_path(user))
         |> halt()
 
@@ -77,7 +77,7 @@ defmodule QaAppWeb.UserAuth do
     end
   end
 
-  def on_mount(:require_super_admin, _params, session, socket) do
+  def on_mount(:require_admin, _params, session, socket) do
     case session["user_id"] do
       nil ->
         {:halt, Phoenix.LiveView.redirect(socket, to: AdminAuth.secret_path())}
@@ -85,7 +85,7 @@ defmodule QaAppWeb.UserAuth do
       user_id ->
         user = Accounts.get_user!(user_id)
 
-        if user.role == :super_admin do
+        if user.role == :admin do
           {:cont, Phoenix.Component.assign(socket, :current_user, user)}
         else
           {:halt, Phoenix.LiveView.redirect(socket, to: AdminAuth.dashboard_path(user))}

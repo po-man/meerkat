@@ -1,4 +1,4 @@
-defmodule QaAppWeb.AdminLiveTest do
+defmodule QaAppWeb.ModeratorLiveTest do
   use QaAppWeb.ConnCase
 
   import Phoenix.LiveViewTest
@@ -11,8 +11,8 @@ defmodule QaAppWeb.AdminLiveTest do
   @secret_path AdminAuth.secret_path()
 
   setup do
-    {:ok, _} = Accounts.create_super_admin(%{"username" => "root", "password" => "secret123"})
-    {:ok, _} = Accounts.create_room_admin(%{"username" => "mod", "password" => "secret123"})
+    {:ok, _} = Accounts.create_admin(%{"username" => "root", "password" => "secret123"})
+    {:ok, _} = Accounts.create_moderator(%{"username" => "mod", "password" => "secret123"})
     :ok
   end
 
@@ -21,10 +21,10 @@ defmodule QaAppWeb.AdminLiveTest do
   end
 
   describe "header sign-out on protected pages" do
-    test "is shown on the room admin dashboard", %{conn: conn} do
+    test "is shown on the moderator dashboard", %{conn: conn} do
       conn = login_as(conn, "mod")
 
-      html = html_response(get(conn, "/admin/dashboard"), 200)
+      html = html_response(get(conn, "/moderator/dashboard"), 200)
       assert html =~ ~s(id="sign-out")
       assert html =~ "Sign Out"
       assert html =~ "mod"
@@ -32,7 +32,7 @@ defmodule QaAppWeb.AdminLiveTest do
 
     test "is shown on the room moderator page", %{conn: conn} do
       {:ok, owner} =
-        Accounts.create_room_admin(%{"username" => "owner", "password" => "secret123"})
+        Accounts.create_moderator(%{"username" => "owner", "password" => "secret123"})
 
       {:ok, room} =
         Events.create_room(%{
@@ -40,29 +40,29 @@ defmodule QaAppWeb.AdminLiveTest do
           "title" => "Town Hall",
           "char_limit" => 320,
           "is_active" => true,
-          "admin_id" => owner.id
+          "moderator_id" => owner.id
         })
 
       conn = login_as(conn, "owner")
 
-      html = html_response(get(conn, "/admin/r/#{room.slug}"), 200)
+      html = html_response(get(conn, "/moderator/r/#{room.slug}"), 200)
       assert html =~ ~s(id="sign-out")
       assert html =~ "Sign Out"
     end
 
-    test "is shown on the super admin dashboard", %{conn: conn} do
+    test "is shown on the admin dashboard", %{conn: conn} do
       conn = login_as(conn, "root")
 
-      html = html_response(get(conn, "/super-admin"), 200)
+      html = html_response(get(conn, "/admin"), 200)
       assert html =~ ~s(id="sign-out")
       assert html =~ "Sign Out"
     end
 
     test "is not shown to anonymous visitors (they are redirected to sign in)", %{conn: conn} do
-      conn = get(conn, "/admin/dashboard")
+      conn = get(conn, "/moderator/dashboard")
       assert redirected_to(conn) == AdminAuth.secret_path()
 
-      conn = get(conn, "/super-admin")
+      conn = get(conn, "/admin")
       assert redirected_to(conn) == AdminAuth.secret_path()
     end
   end
@@ -70,7 +70,7 @@ defmodule QaAppWeb.AdminLiveTest do
   describe "moderation pages render with live content" do
     setup do
       {:ok, owner} =
-        Accounts.create_room_admin(%{"username" => "moder", "password" => "secret123"})
+        Accounts.create_moderator(%{"username" => "moder", "password" => "secret123"})
 
       {:ok, room} =
         Events.create_room(%{
@@ -78,7 +78,7 @@ defmodule QaAppWeb.AdminLiveTest do
           "title" => "Render Room",
           "char_limit" => 320,
           "is_active" => true,
-          "admin_id" => owner.id
+          "moderator_id" => owner.id
         })
 
       {:ok, _} =
@@ -90,7 +90,7 @@ defmodule QaAppWeb.AdminLiveTest do
     test "room dashboard lists the assigned room", %{conn: conn, owner: owner} do
       conn = login_as(conn, owner.username)
 
-      html = html_response(get(conn, "/admin/dashboard"), 200)
+      html = html_response(get(conn, "/moderator/dashboard"), 200)
       assert html =~ "Render Room"
       assert html =~ "/r/render-room"
     end
@@ -98,16 +98,16 @@ defmodule QaAppWeb.AdminLiveTest do
     test "moderator page shows the question queue", %{conn: conn, owner: owner, room: room} do
       conn = login_as(conn, owner.username)
 
-      html = html_response(get(conn, "/admin/r/#{room.slug}"), 200)
+      html = html_response(get(conn, "/moderator/r/#{room.slug}"), 200)
       assert html =~ "Queue this question"
-      assert html =~ ~s(id="admin-questions-feed")
+      assert html =~ ~s(id="moderator-questions-feed")
     end
   end
 
   describe "raised and asked question tabs" do
     setup do
       {:ok, owner} =
-        Accounts.create_room_admin(%{"username" => "moder", "password" => "secret123"})
+        Accounts.create_moderator(%{"username" => "moder", "password" => "secret123"})
 
       {:ok, room} =
         Events.create_room(%{
@@ -115,7 +115,7 @@ defmodule QaAppWeb.AdminLiveTest do
           "title" => "Tab Room",
           "char_limit" => 320,
           "is_active" => true,
-          "admin_id" => owner.id
+          "moderator_id" => owner.id
         })
 
       {:ok, raised_question} =
@@ -132,7 +132,7 @@ defmodule QaAppWeb.AdminLiveTest do
 
     defp open_room(conn, owner, slug, query \\ "") do
       conn = login_as(conn, owner.username)
-      {:ok, view, _html} = live(conn, "/admin/r/#{slug}#{query}")
+      {:ok, view, _html} = live(conn, "/moderator/r/#{slug}#{query}")
       view
     end
 
@@ -145,12 +145,12 @@ defmodule QaAppWeb.AdminLiveTest do
     } do
       view = open_room(conn, owner, room.slug)
 
-      assert has_element?(view, "#admin-tabs")
-      assert has_element?(view, "#admin-tab-raised")
-      assert has_element?(view, "#admin-tab-asked")
+      assert has_element?(view, "#moderator-tabs")
+      assert has_element?(view, "#moderator-tab-raised")
+      assert has_element?(view, "#moderator-tab-asked")
       assert has_element?(view, "#raised-questions-feed")
-      assert has_element?(view, "#raised-questions-feed #admin-q-#{raised_question.id}")
-      refute has_element?(view, "#raised-questions-feed #admin-q-#{asked_question.id}")
+      assert has_element?(view, "#raised-questions-feed #moderator-q-#{raised_question.id}")
+      refute has_element?(view, "#raised-questions-feed #moderator-q-#{asked_question.id}")
       refute has_element?(view, "#asked-questions-feed")
     end
 
@@ -163,11 +163,11 @@ defmodule QaAppWeb.AdminLiveTest do
     } do
       view = open_room(conn, owner, room.slug)
 
-      view |> element("#admin-tab-asked") |> render_click()
+      view |> element("#moderator-tab-asked") |> render_click()
 
       assert has_element?(view, "#asked-questions-feed")
-      assert has_element?(view, "#asked-questions-feed #admin-q-#{asked_question.id}")
-      refute has_element?(view, "#asked-questions-feed #admin-q-#{raised_question.id}")
+      assert has_element?(view, "#asked-questions-feed #moderator-q-#{asked_question.id}")
+      refute has_element?(view, "#asked-questions-feed #moderator-q-#{raised_question.id}")
       refute has_element?(view, "#raised-questions-feed")
     end
 
@@ -180,7 +180,7 @@ defmodule QaAppWeb.AdminLiveTest do
       view = open_room(conn, owner, room.slug, "?tab=asked")
 
       assert has_element?(view, "#asked-questions-feed")
-      assert has_element?(view, "#asked-questions-feed #admin-q-#{asked_question.id}")
+      assert has_element?(view, "#asked-questions-feed #moderator-q-#{asked_question.id}")
     end
 
     test "marking a raised question as asked moves it to the asked tab", %{
@@ -192,14 +192,14 @@ defmodule QaAppWeb.AdminLiveTest do
       view = open_room(conn, owner, room.slug)
 
       view
-      |> element(~s(#admin-q-#{raised_question.id} button[phx-click="mark_asked"]))
+      |> element(~s(#moderator-q-#{raised_question.id} button[phx-click="mark_asked"]))
       |> render_click()
 
-      refute has_element?(view, "#raised-questions-feed #admin-q-#{raised_question.id}")
+      refute has_element?(view, "#raised-questions-feed #moderator-q-#{raised_question.id}")
 
-      view |> element("#admin-tab-asked") |> render_click()
+      view |> element("#moderator-tab-asked") |> render_click()
 
-      assert has_element?(view, "#asked-questions-feed #admin-q-#{raised_question.id}")
+      assert has_element?(view, "#asked-questions-feed #moderator-q-#{raised_question.id}")
     end
 
     test "moving an asked question back to raised returns it to the raised tab", %{
@@ -210,24 +210,24 @@ defmodule QaAppWeb.AdminLiveTest do
     } do
       view = open_room(conn, owner, room.slug, "?tab=asked")
 
-      assert has_element?(view, "#asked-questions-feed #admin-q-#{asked_question.id}")
+      assert has_element?(view, "#asked-questions-feed #moderator-q-#{asked_question.id}")
 
       view
-      |> element(~s(#admin-q-#{asked_question.id} button[phx-click="mark_unasked"]))
+      |> element(~s(#moderator-q-#{asked_question.id} button[phx-click="mark_unasked"]))
       |> render_click()
 
-      refute has_element?(view, "#asked-questions-feed #admin-q-#{asked_question.id}")
+      refute has_element?(view, "#asked-questions-feed #moderator-q-#{asked_question.id}")
 
-      view |> element("#admin-tab-raised") |> render_click()
+      view |> element("#moderator-tab-raised") |> render_click()
 
-      assert has_element?(view, "#raised-questions-feed #admin-q-#{asked_question.id}")
+      assert has_element?(view, "#raised-questions-feed #moderator-q-#{asked_question.id}")
     end
   end
 
   describe "moderator page navigation tabs" do
     setup do
       {:ok, owner} =
-        Accounts.create_room_admin(%{"username" => "nav-owner", "password" => "secret123"})
+        Accounts.create_moderator(%{"username" => "nav-owner", "password" => "secret123"})
 
       {:ok, room} =
         Events.create_room(%{
@@ -235,7 +235,7 @@ defmodule QaAppWeb.AdminLiveTest do
           "title" => "Nav Room",
           "char_limit" => 320,
           "is_active" => true,
-          "admin_id" => owner.id
+          "moderator_id" => owner.id
         })
 
       {:ok, owner: owner, room: room}
@@ -247,7 +247,7 @@ defmodule QaAppWeb.AdminLiveTest do
       room: room
     } do
       conn = login_as(conn, owner.username)
-      {:ok, view, _html} = live(conn, "/admin/r/#{room.slug}")
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}")
 
       assert has_element?(view, "#room-tabs")
       assert has_element?(view, "#room-tab-questions")
@@ -260,7 +260,7 @@ defmodule QaAppWeb.AdminLiveTest do
       room: room
     } do
       conn = login_as(conn, owner.username)
-      {:ok, view, _html} = live(conn, "/admin/r/#{room.slug}")
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}")
 
       result = view |> element("#room-tab-settings") |> render_click()
 

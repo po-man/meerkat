@@ -8,7 +8,7 @@ defmodule QaApp.Accounts.User do
     field :username, :string
     field :password, :string, virtual: true, redact: true
     field :hashed_password, :string, redact: true
-    field :role, Ecto.Enum, values: [:super_admin, :room_admin]
+    field :role, Ecto.Enum, values: [:admin, :moderator]
     field :must_change_password, :boolean, default: false
 
     timestamps(type: :utc_datetime)

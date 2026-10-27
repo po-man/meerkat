@@ -1,4 +1,4 @@
-defmodule QaAppWeb.AdminLiveSettingsTest do
+defmodule QaAppWeb.ModeratorLiveSettingsTest do
   use QaAppWeb.ConnCase
 
   import Phoenix.LiveViewTest
@@ -10,8 +10,8 @@ defmodule QaAppWeb.AdminLiveSettingsTest do
   @secret_path AdminAuth.secret_path()
 
   setup do
-    {:ok, _} = Accounts.create_super_admin(%{"username" => "root", "password" => "secret123"})
-    {:ok, _} = Accounts.create_room_admin(%{"username" => "mod", "password" => "secret123"})
+    {:ok, _} = Accounts.create_admin(%{"username" => "root", "password" => "secret123"})
+    {:ok, _} = Accounts.create_moderator(%{"username" => "mod", "password" => "secret123"})
     :ok
   end
 
@@ -22,7 +22,7 @@ defmodule QaAppWeb.AdminLiveSettingsTest do
   describe "room settings page" do
     setup do
       {:ok, owner} =
-        Accounts.create_room_admin(%{"username" => "settings-owner", "password" => "secret123"})
+        Accounts.create_moderator(%{"username" => "settings-owner", "password" => "secret123"})
 
       {:ok, room} =
         Events.create_room(%{
@@ -31,7 +31,7 @@ defmodule QaAppWeb.AdminLiveSettingsTest do
           "intro_text" => "Original intro",
           "char_limit" => 50,
           "is_active" => true,
-          "admin_id" => owner.id
+          "moderator_id" => owner.id
         })
 
       {:ok, owner: owner, room: room}
@@ -43,19 +43,19 @@ defmodule QaAppWeb.AdminLiveSettingsTest do
       room: room
     } do
       conn = login_as(conn, owner.username)
-      {:ok, view, _html} = live(conn, "/admin/r/#{room.slug}/settings")
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}/settings")
 
       assert has_element?(view, "#settings-form")
       assert has_element?(view, "#room-tabs")
       assert has_element?(view, "#room-tab-settings")
       assert has_element?(view, "#room-tab-questions")
-      assert has_element?(view, ~s(a[href="/admin/r/#{room.slug}/export.csv"]))
+      assert has_element?(view, ~s(a[href="/moderator/r/#{room.slug}/export.csv"]))
       assert render(view) =~ ~s(id="sign-out")
     end
 
     test "updates the room settings on submit", %{conn: conn, owner: owner, room: room} do
       conn = login_as(conn, owner.username)
-      {:ok, view, _html} = live(conn, "/admin/r/#{room.slug}/settings")
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}/settings")
 
       view
       |> form("#settings-form",
@@ -81,7 +81,7 @@ defmodule QaAppWeb.AdminLiveSettingsTest do
       room: room
     } do
       conn = login_as(conn, owner.username)
-      {:ok, view, _html} = live(conn, "/admin/r/#{room.slug}/settings")
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}/settings")
 
       html =
         view
@@ -91,17 +91,17 @@ defmodule QaAppWeb.AdminLiveSettingsTest do
       assert html =~ "must be greater than 0"
     end
 
-    test "redirects an admin who does not own the room", %{conn: conn, room: room} do
+    test "redirects a moderator who does not own the room", %{conn: conn, room: room} do
       {:ok, other} =
-        Accounts.create_room_admin(%{"username" => "other-admin", "password" => "secret123"})
+        Accounts.create_moderator(%{"username" => "other-mod", "password" => "secret123"})
 
       conn = login_as(conn, other.username)
 
-      assert {:error, {:redirect, %{to: "/"}}} = live(conn, "/admin/r/#{room.slug}/settings")
+      assert {:error, {:redirect, %{to: "/"}}} = live(conn, "/moderator/r/#{room.slug}/settings")
     end
 
     test "redirects anonymous visitors to sign in", %{conn: conn, room: room} do
-      conn = get(conn, "/admin/r/#{room.slug}/settings")
+      conn = get(conn, "/moderator/r/#{room.slug}/settings")
       assert redirected_to(conn) == AdminAuth.secret_path()
     end
   end

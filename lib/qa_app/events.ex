@@ -14,19 +14,19 @@ defmodule QaApp.Events do
     Room
     |> order_by([r], desc: r.inserted_at)
     |> Repo.all()
-    |> Repo.preload(:admin)
+    |> Repo.preload(:moderator)
   end
 
   def get_room!(id) do
     Room
     |> Repo.get!(id)
-    |> Repo.preload(:admin)
+    |> Repo.preload(:moderator)
   end
 
   def get_room_by_slug(slug) when is_binary(slug) do
     Room
     |> Repo.get_by(slug: slug)
-    |> Repo.preload(:admin)
+    |> Repo.preload(:moderator)
   end
 
   def create_room(attrs \\ %{}) do

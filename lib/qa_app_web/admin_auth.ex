@@ -17,10 +17,10 @@ defmodule QaAppWeb.AdminAuth do
   @doc """
   The dashboard a signed-in user should be sent to, based on their role:
 
-    * `:super_admin` -> `/super-admin`
-    * `:room_admin`  -> `/admin/dashboard`
+    * `:admin`     -> `/admin`
+    * `:moderator` -> `/moderator/dashboard`
 
   """
-  def dashboard_path(%{role: :super_admin}), do: "/super-admin"
-  def dashboard_path(_user), do: "/admin/dashboard"
+  def dashboard_path(%{role: :admin}), do: "/admin"
+  def dashboard_path(_user), do: "/moderator/dashboard"
 end

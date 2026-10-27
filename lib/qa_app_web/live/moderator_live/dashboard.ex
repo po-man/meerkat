@@ -1,4 +1,4 @@
-defmodule QaAppWeb.AdminLive.Dashboard do
+defmodule QaAppWeb.ModeratorLive.Dashboard do
   use QaAppWeb, :live_view
 
   alias QaApp.Events
@@ -19,7 +19,7 @@ defmodule QaAppWeb.AdminLive.Dashboard do
 
   defp rooms_for(current_user) do
     Events.list_rooms()
-    |> Enum.filter(fn r -> r.admin_id == current_user.id end)
+    |> Enum.filter(fn r -> r.moderator_id == current_user.id end)
   end
 
   def render(assigns) do
@@ -48,7 +48,7 @@ defmodule QaAppWeb.AdminLive.Dashboard do
               No assigned rooms found
             </p>
             <p class="mt-2 text-[13px] leading-relaxed text-ink-3">
-              Contact your Super Administrator to create or assign a room to your account.
+              Contact your Administrator to create or assign a room to your account.
             </p>
           </div>
         <% else %>
@@ -80,7 +80,7 @@ defmodule QaAppWeb.AdminLive.Dashboard do
 
                 <div class="col-span-8 sm:col-span-3 flex items-center justify-end gap-5">
                   <.link
-                    navigate={~p"/admin/r/#{room.slug}"}
+                    navigate={~p"/moderator/r/#{room.slug}"}
                     class="text-sm font-medium text-ink underline-offset-4 hover:underline transition-colors"
                   >
                     Open Dashboard →
