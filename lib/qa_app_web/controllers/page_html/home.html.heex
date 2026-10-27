@@ -1,32 +1,26 @@
-<Layouts.flash_group flash={@flash} />
-<div class="min-h-[85vh] flex flex-col items-center justify-center px-4 py-12 text-center">
-  <div class="max-w-2xl space-y-6 bg-slate-800/80 backdrop-blur-md p-8 sm:p-12 rounded-3xl border border-slate-700/60 shadow-2xl">
-    <div class="mx-auto w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/20 shadow-inner">
-      <.icon name="hero-chat-bubble-bottom-center-text" class="w-8 h-8" />
-    </div>
+<QaAppWeb.Layouts.app flash={@flash}>
+  <div class="max-w-6xl mx-auto px-6 pt-20 sm:pt-28 pb-24">
+    <div class="grid grid-cols-12 gap-x-6">
+      <div class="col-span-12 lg:col-span-8">
+        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
+          <span class="w-2 h-2 bg-accent"></span> Town halls · Conferences · Meetups
+        </p>
 
-    <h1 class="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
-      Real-Time Anonymous Q&A Platform
-    </h1>
+        <h1 class="mt-6 text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-[-0.04em] leading-[1.02] text-ink">
+          Real-Time Anonymous Q&amp;A<span class="text-accent">.</span>
+        </h1>
+      </div>
 
-    <p class="text-slate-300 text-base sm:text-lg leading-relaxed">
-      Frictionless, live audience interaction for town halls, conferences, and meetups. Join an active room with your event code or sign in as an admin.
-    </p>
+      <div class="col-span-12 lg:col-span-4 lg:col-start-9 mt-10 lg:mt-24 flex flex-col justify-end gap-6">
+        <p class="text-[15px] leading-relaxed text-ink-2">
+          Frictionless, live audience interaction for town halls, conferences, and meetups. Join an
+          active room with the event code shared by its host.
+        </p>
 
-    <div class="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
-      <.link
-        href={~p"/login"}
-        class="w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/25 transition-all duration-200"
-      >
-        Admin Portal Login
-      </.link>
-
-      <.link
-        href={~p"/super-admin/setup"}
-        class="w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all duration-200"
-      >
-        Super Admin Setup
-      </.link>
+        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+          One question per device
+        </p>
+      </div>
     </div>
   </div>
-</div>
+</QaAppWeb.Layouts.app>

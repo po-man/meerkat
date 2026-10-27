@@ -86,176 +86,192 @@ defmodule QaAppWeb.AdminLive.Show do
 
   def render(assigns) do
     ~H"""
-    <QaAppWeb.Layouts.app flash={@flash}>
-      <div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        <!-- Top Admin Banner -->
-        <div class="bg-slate-800/80 backdrop-blur-md rounded-2xl p-6 border border-indigo-500/30 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div class="flex items-center gap-2 mb-1">
-              <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+    <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
+      <div class="max-w-6xl mx-auto px-6 pt-12 sm:pt-16 pb-24">
+        <!-- Masthead -->
+        <header class="border-b border-line pb-8">
+          <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+            <div>
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
+                <span class="w-2 h-2 bg-accent"></span>
                 Moderator Dashboard
-              </span>
-              <span class="text-xs text-slate-400">Slug: /r/{@room.slug}</span>
+                <span class="text-ink-3/40 normal-case tracking-normal">/r/{@room.slug}</span>
+              </p>
+              <h1 class="mt-4 text-3xl sm:text-4xl font-semibold tracking-[-0.03em] leading-[1.05] text-ink">
+                {@room.title}
+              </h1>
             </div>
-            <h1 class="text-2xl font-bold text-white">{@room.title}</h1>
+
+            <div class="flex items-center gap-3">
+              <button
+                phx-click="toggle_qr_modal"
+                class="inline-flex items-center gap-2 h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
+              >
+                <.icon name="hero-qr-code" class="size-4" /> Share QR Code
+              </button>
+
+              <.link
+                href={~p"/admin/r/#{@room.slug}/export.csv"}
+                target="_blank"
+                class="inline-flex items-center gap-2 h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
+              >
+                <.icon name="hero-arrow-down-tray" class="size-4" /> Export CSV
+              </.link>
+            </div>
           </div>
+        </header>
 
-          <div class="flex items-center gap-3">
-            <button
-              phx-click="toggle_qr_modal"
-              class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-slate-700/80 text-white hover:bg-slate-600 transition-all border border-slate-600"
-            >
-              <.icon name="hero-qr-code" class="w-4 h-4" /> Share QR Code
-            </button>
-
-            <.link
-              href={~p"/admin/r/#{@room.slug}/export.csv"}
-              target="_blank"
-              class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-600/20"
-            >
-              <.icon name="hero-arrow-down-tray" class="w-4 h-4" /> Export CSV
-            </.link>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-12 gap-x-8 lg:gap-x-12 mt-10">
           <!-- Left Column: Room Settings Form -->
-          <div class="lg:col-span-1 bg-slate-800/80 backdrop-blur-md rounded-2xl p-6 border border-slate-700/60 shadow-xl space-y-4">
-            <h3 class="text-lg font-bold text-white flex items-center gap-2">
-              <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-indigo-400" /> Event Settings
+          <section class="col-span-12 lg:col-span-4 lg:border-r lg:border-line lg:pr-10">
+            <h3 class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+              Event Settings
             </h3>
 
             <.form
               for={@settings_form}
               id="settings-form"
               phx-submit="save_settings"
-              class="space-y-4"
+              class="mt-6 space-y-5"
             >
               <div>
-                <label class="block text-xs font-medium text-slate-300 mb-1">Event Title</label>
-                <.input
-                  field={@settings_form[:title]}
-                  type="text"
-                  class="w-full bg-slate-900/90 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
-                />
+                <.input field={@settings_form[:title]} type="text" label="Event Title" />
               </div>
 
               <div>
-                <label class="block text-xs font-medium text-slate-300 mb-1">Intro Text</label>
-                <.input
-                  field={@settings_form[:intro_text]}
-                  type="textarea"
-                  class="w-full bg-slate-900/90 border-slate-700 text-white rounded-xl p-3.5 text-sm h-24 resize-none"
-                />
+                <.input field={@settings_form[:intro_text]} type="textarea" label="Intro Text" />
               </div>
 
               <div>
-                <label class="block text-xs font-medium text-slate-300 mb-1">Max Word Limit per Question</label>
                 <.input
                   field={@settings_form[:word_limit]}
                   type="number"
-                  class="w-full bg-slate-900/90 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
+                  label="Max Word Limit per Question"
                 />
               </div>
 
               <button
                 type="submit"
-                class="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all shadow-md"
+                class="w-full inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
               >
                 Save Settings
               </button>
             </.form>
-          </div>
+          </section>
 
           <!-- Right Column: Live Moderation Question Feed -->
-          <div class="lg:col-span-2 space-y-4">
-            <div class="flex items-center justify-between px-1">
-              <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                <.icon name="hero-queue-list" class="w-5 h-5 text-indigo-400" />
-                Questions ({length(@questions)})
+          <section class="col-span-12 lg:col-span-8 mt-10 lg:mt-0">
+            <div class="flex items-baseline justify-between gap-4 pb-3 border-b border-line">
+              <h3 class="text-lg font-semibold tracking-[-0.01em] text-ink">
+                Questions
               </h3>
+              <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
+                {length(@questions)} total · Sorted by votes
+              </span>
             </div>
 
             <%= if Enum.empty?(@questions) do %>
-              <div class="bg-slate-800/40 rounded-2xl p-8 text-center border border-slate-700/40">
-                <p class="text-slate-400 font-medium">No questions submitted yet.</p>
+              <div class="py-16 text-center">
+                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                  No questions submitted yet
+                </p>
               </div>
             <% else %>
-              <div id="admin-questions-feed" class="space-y-3">
-                <%= for question <- @questions do %>
+              <div id="admin-questions-feed">
+                <%= for {question, i} <- Enum.with_index(@questions) do %>
                   <div
                     id={"admin-q-#{question.id}"}
                     class={[
-                      "rounded-2xl p-5 border shadow-lg flex items-start justify-between gap-4 transition-all duration-200",
-                      if(question.is_asked,
-                        do: "bg-slate-900/40 border-slate-800/60 opacity-60",
-                        else: "bg-slate-800/80 backdrop-blur-md border-slate-700/60"
-                      )
+                      "grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-5 border-b border-line",
+                      if(question.is_asked, do: "opacity-60")
                     ]}
                   >
-                    <div class="flex items-start gap-3 flex-1 min-w-0">
-                      <div class="bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-xl font-bold text-sm min-w-[48px] text-center">
-                        ▲ {question.vote_count}
-                      </div>
+                    <div class="col-span-2 sm:col-span-1">
+                      <span class="font-mono text-xs text-ink-3 tabular-nums">{i + 1}</span>
+                    </div>
 
-                      <div class="flex-1 min-w-0">
-                        <p class="text-slate-100 text-base leading-relaxed break-words">
+                    <div class="col-span-10 sm:col-span-11 flex items-start gap-4">
+                      <span class={[
+                        "shrink-0 w-11 py-2 rounded border flex flex-col items-center justify-center gap-0.5 font-mono text-xs tabular-nums",
+                        if(question.is_asked,
+                          do: "border-line text-ink-3",
+                          else: "border-line-strong text-ink"
+                        )
+                      ]}>
+                        <.icon name="hero-chevron-up" class="size-3.5" />
+                        {question.vote_count}
+                      </span>
+
+                      <div class="flex-1 min-w-0 pt-1">
+                        <p class="text-[16px] leading-relaxed text-ink break-words">
                           {question.content}
                         </p>
-                        <div class="mt-2 flex items-center gap-3 text-xs text-slate-400">
-                          <span>Submitted {Calendar.strftime(question.inserted_at, "%I:%M %p")}</span>
+                        <div class="mt-2 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                          <span class="normal-case tracking-normal tabular-nums">
+                            Submitted {Calendar.strftime(question.inserted_at, "%I:%M %p")}
+                          </span>
                           <%= if question.is_asked do %>
-                            <span class="text-emerald-400 font-bold">• Answered / Asked</span>
+                            <span class="text-ink-2 flex items-center gap-1.5">
+                              <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Asked
+                            </span>
                           <% end %>
                         </div>
                       </div>
                     </div>
 
-                    <div>
+                    <div class="col-span-12 sm:col-span-3 flex sm:justify-end pt-3 sm:pt-1">
                       <%= if not question.is_asked do %>
                         <button
                           phx-click="mark_asked"
                           phx-value-id={question.id}
-                          class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 border border-emerald-500/30 transition-all flex items-center gap-1.5"
+                          class="inline-flex items-center gap-1.5 h-8 px-3 rounded border border-line-strong bg-transparent text-ink-2 text-xs font-medium hover:border-ink hover:text-ink transition-colors duration-150"
                         >
-                          <.icon name="hero-check" class="w-4 h-4" /> Mark as Asked
+                          <.icon name="hero-check" class="size-3.5" /> Mark as Asked
                         </button>
                       <% else %>
-                        <span class="text-xs text-slate-500 font-medium px-2 py-1">Asked</span>
+                        <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                          Asked
+                        </span>
                       <% end %>
                     </div>
                   </div>
                 <% end %>
               </div>
             <% end %>
-          </div>
+          </section>
         </div>
 
         <!-- QR Code Sharing Modal -->
         <%= if @show_qr_modal? do %>
-          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div class="bg-slate-800 border border-slate-700 rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative">
+          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+            <div class="bg-paper border border-line-strong rounded-lg p-6 sm:p-8 max-w-sm w-full text-center relative">
               <button
                 phx-click="toggle_qr_modal"
-                class="absolute top-4 right-4 text-slate-400 hover:text-white"
+                aria-label="Close"
+                class="absolute top-3 right-3 w-9 h-9 rounded border border-transparent hover:border-line-strong flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
               >
-                <.icon name="hero-x-mark" class="w-6 h-6" />
+                <.icon name="hero-x-mark" class="size-5" />
               </button>
 
-              <h3 class="text-xl font-bold text-white">Audience QR Code</h3>
-              <p class="text-xs text-slate-400">Scan to open live room: /r/{@room.slug}</p>
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                Audience QR Code
+              </p>
+              <h3 class="mt-3 text-xl font-semibold tracking-[-0.02em] text-ink">
+                Join this room
+              </h3>
+              <p class="mt-1 font-mono text-xs text-ink-3 break-all">/r/{@room.slug}</p>
 
-              <div class="bg-white p-4 rounded-2xl inline-block border border-slate-200">
-                <img src={~p"/admin/r/#{@room.slug}/qr.png"} alt="QR Code" class="w-48 h-48 mx-auto" />
+              <div class="mt-6 inline-block bg-white p-4 border border-line-strong rounded">
+                <img src={~p"/admin/r/#{@room.slug}/qr.png"} alt="QR Code" class="w-44 h-44 mx-auto" />
               </div>
 
-              <div>
+              <div class="mt-5">
                 <a
                   href={~p"/r/#{@room.slug}"}
                   target="_blank"
-                  class="text-xs text-indigo-400 hover:underline break-all"
+                  class="text-[13px] font-medium text-ink underline-offset-4 hover:underline hover:text-accent transition-colors break-all"
                 >
-                  Open Audience Link
+                  Open Audience Link →
                 </a>
               </div>
             </div>

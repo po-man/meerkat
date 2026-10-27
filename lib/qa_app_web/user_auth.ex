@@ -3,6 +3,7 @@ defmodule QaAppWeb.UserAuth do
   import Phoenix.Controller
 
   alias QaApp.Accounts
+  alias QaAppWeb.AdminAuth
 
   def log_in_user(conn, user) do
     conn
@@ -28,7 +29,7 @@ defmodule QaAppWeb.UserAuth do
     else
       conn
       |> put_flash(:error, "You must log in to access this page.")
-      |> redirect(to: "/login")
+      |> redirect(to: AdminAuth.secret_path())
       |> halt()
     end
   end
@@ -36,13 +37,21 @@ defmodule QaAppWeb.UserAuth do
   def require_super_admin(conn, _opts) do
     user = conn.assigns[:current_user]
 
-    if user && user.role == :super_admin do
-      conn
-    else
-      conn
-      |> put_flash(:error, "Access denied. Super Admin privileges required.")
-      |> redirect(to: "/")
-      |> halt()
+    cond do
+      user && user.role == :super_admin ->
+        conn
+
+      user ->
+        conn
+        |> put_flash(:error, "Access denied. Super Admin privileges required.")
+        |> redirect(to: AdminAuth.dashboard_path(user))
+        |> halt()
+
+      true ->
+        conn
+        |> put_flash(:error, "You must log in to access this page.")
+        |> redirect(to: AdminAuth.secret_path())
+        |> halt()
     end
   end
 
@@ -60,7 +69,7 @@ defmodule QaAppWeb.UserAuth do
   def on_mount(:require_authenticated_user, _params, session, socket) do
     case session["user_id"] do
       nil ->
-        {:halt, Phoenix.LiveView.redirect(socket, to: "/login")}
+        {:halt, Phoenix.LiveView.redirect(socket, to: AdminAuth.secret_path())}
 
       user_id ->
         user = Accounts.get_user!(user_id)
@@ -71,7 +80,7 @@ defmodule QaAppWeb.UserAuth do
   def on_mount(:require_super_admin, _params, session, socket) do
     case session["user_id"] do
       nil ->
-        {:halt, Phoenix.LiveView.redirect(socket, to: "/login")}
+        {:halt, Phoenix.LiveView.redirect(socket, to: AdminAuth.secret_path())}
 
       user_id ->
         user = Accounts.get_user!(user_id)
@@ -79,7 +88,7 @@ defmodule QaAppWeb.UserAuth do
         if user.role == :super_admin do
           {:cont, Phoenix.Component.assign(socket, :current_user, user)}
         else
-          {:halt, Phoenix.LiveView.redirect(socket, to: "/")}
+          {:halt, Phoenix.LiveView.redirect(socket, to: AdminAuth.dashboard_path(user))}
         end
     end
   end

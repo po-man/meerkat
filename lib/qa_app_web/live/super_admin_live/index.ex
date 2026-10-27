@@ -137,111 +137,136 @@ defmodule QaAppWeb.SuperAdminLive.Index do
 
   def render(assigns) do
     ~H"""
-    <QaAppWeb.Layouts.app flash={@flash}>
-      <div class="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        <div class="flex items-center justify-between border-b border-slate-700/60 pb-6">
-          <div>
-            <h1 class="text-3xl font-extrabold text-white flex items-center gap-3">
-              <.icon name="hero-shield-check" class="w-8 h-8 text-amber-400" />
-              Super Admin Control Center
-            </h1>
-            <p class="text-sm text-slate-400 mt-1">
-              Manage system rooms, administrators, and event routing.
-            </p>
+    <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
+      <div class="max-w-6xl mx-auto px-6 pt-12 sm:pt-16 pb-24">
+        <header class="border-b border-line pb-8">
+          <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+            <div>
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
+                <span class="w-2 h-2 bg-accent"></span> System
+              </p>
+              <h1 class="mt-4 text-3xl sm:text-4xl font-semibold tracking-[-0.03em] leading-[1.05] text-ink">
+                Super Admin Control Center
+              </h1>
+              <p class="mt-2 text-sm text-ink-2">
+                Manage system rooms, administrators, and event routing.
+              </p>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button
+                phx-click="open_create_admin"
+                class="inline-flex items-center gap-2 h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
+              >
+                <.icon name="hero-user-plus" class="size-4" /> Add Room Admin
+              </button>
+
+              <button
+                phx-click="open_create_room"
+                class="inline-flex items-center gap-2 h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
+              >
+                <.icon name="hero-plus" class="size-4" /> Create Room
+              </button>
+            </div>
           </div>
+        </header>
 
-          <div class="flex items-center gap-3">
-            <button
-              phx-click="open_create_admin"
-              class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-700 hover:bg-slate-600 text-white transition-all border border-slate-600 flex items-center gap-2"
-            >
-              <.icon name="hero-user-plus" class="w-4 h-4" /> Add Room Admin
-            </button>
-
-            <button
-              phx-click="open_create_room"
-              class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2"
-            >
-              <.icon name="hero-plus" class="w-4 h-4" /> Create Room
-            </button>
-          </div>
-        </div>
-
-        <!-- Rooms List Table -->
-        <div class="bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-700/60 shadow-xl overflow-hidden">
-          <div class="p-6 border-b border-slate-700/60 flex items-center justify-between">
-            <h3 class="text-lg font-bold text-white">Event Rooms ({length(@rooms)})</h3>
+        <!-- Rooms List -->
+        <section class="mt-10">
+          <div class="flex items-baseline justify-between gap-4 pb-3 border-b border-line">
+            <h3 class="text-lg font-semibold tracking-[-0.01em] text-ink">Event Rooms</h3>
+            <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
+              {length(@rooms)} total
+            </span>
           </div>
 
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm text-slate-300">
-              <thead class="bg-slate-900/60 text-xs uppercase text-slate-400 border-b border-slate-700/60">
+            <table class="w-full text-left text-sm min-w-[640px]">
+              <thead>
                 <tr>
-                  <th class="px-6 py-4">Title / Slug</th>
-                  <th class="px-6 py-4">Assigned Admin</th>
-                  <th class="px-6 py-4">Word Limit</th>
-                  <th class="px-6 py-4 text-right">Actions</th>
+                  <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
+                    Title / Slug
+                  </th>
+                  <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
+                    Assigned Admin
+                  </th>
+                  <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
+                    Word Limit
+                  </th>
+                  <th class="py-3 border-b border-line-strong text-right">
+                    <span class="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-700/40">
+              <tbody>
                 <%= for room <- @rooms do %>
-                  <tr class="hover:bg-slate-700/30 transition-all">
-                    <td class="px-6 py-4">
-                      <div class="font-bold text-white">{room.title}</div>
-                      <div class="text-xs text-indigo-400 font-mono">/r/{room.slug}</div>
+                  <tr class="border-b border-line hover:bg-surface transition-colors">
+                    <td class="py-4 pr-4 align-top">
+                      <div class="font-semibold text-ink">{room.title}</div>
+                      <div class="mt-0.5 font-mono text-xs text-ink-3">/r/{room.slug}</div>
                     </td>
-                    <td class="px-6 py-4">
+                    <td class="py-4 pr-4 align-top">
                       <%= if room.admin do %>
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                          {room.admin.username}
-                        </span>
+                        <span class="font-mono text-xs text-ink-2">{room.admin.username}</span>
                       <% else %>
-                        <span class="text-xs text-slate-500 italic">Unassigned</span>
+                        <span class="font-mono text-xs text-ink-3">Unassigned</span>
                       <% end %>
                     </td>
-                    <td class="px-6 py-4 font-semibold text-slate-300">{room.word_limit} words</td>
-                    <td class="px-6 py-4 text-right space-x-2">
-                      <button
-                        phx-click="open_configure_room"
-                        phx-value-id={room.id}
-                        class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600/30 text-amber-300 hover:bg-amber-600/40 border border-amber-500/30"
-                      >
-                        Configure
-                      </button>
-                      <.link
-                        navigate={~p"/admin/r/#{room.slug}"}
-                        class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/40 border border-indigo-500/30"
-                      >
-                        Moderate
-                      </.link>
-                      <button
-                        phx-click="delete_room"
-                        phx-value-id={room.id}
-                        data-confirm="Are you sure you want to delete this room?"
-                        class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600/20 text-rose-300 hover:bg-rose-600/30 border border-rose-500/30"
-                      >
-                        Delete
-                      </button>
+                    <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
+                      {room.word_limit} words
+                    </td>
+                    <td class="py-4 align-top text-right whitespace-nowrap">
+                      <div class="inline-flex items-center gap-4">
+                        <button
+                          phx-click="open_configure_room"
+                          phx-value-id={room.id}
+                          class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors underline-offset-4 hover:underline"
+                        >
+                          Configure
+                        </button>
+                        <.link
+                          navigate={~p"/admin/r/#{room.slug}"}
+                          class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors underline-offset-4 hover:underline"
+                        >
+                          Moderate
+                        </.link>
+                        <button
+                          phx-click="delete_room"
+                          phx-value-id={room.id}
+                          data-confirm="Are you sure you want to delete this room?"
+                          class="text-[13px] font-medium text-danger hover:underline underline-offset-4 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 <% end %>
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
 
         <!-- Configure Room Modal -->
         <%= if @show_configure_room_modal? do %>
-          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div class="bg-slate-800 border border-slate-700 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+            <div class="bg-paper border border-line-strong rounded-lg p-6 sm:p-8 max-w-md w-full space-y-5 relative">
               <button
                 phx-click="close_configure_room"
-                class="absolute top-4 right-4 text-slate-400 hover:text-white"
+                aria-label="Close"
+                class="absolute top-3 right-3 w-9 h-9 rounded border border-transparent hover:border-line-strong flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
               >
-                <.icon name="hero-x-mark" class="w-6 h-6" />
+                <.icon name="hero-x-mark" class="size-5" />
               </button>
 
-              <h3 class="text-xl font-bold text-white">Configure Room Settings</h3>
+              <div>
+                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                  Configure Room
+                </p>
+                <h3 class="mt-2 text-xl font-semibold tracking-[-0.02em] text-ink">
+                  Room Settings
+                </h3>
+              </div>
 
               <.form
                 for={@edit_room_form}
@@ -249,31 +274,26 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                 phx-submit="update_room"
                 class="space-y-4"
               >
-                <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Room Title</label>
-                  <.input
-                    field={@edit_room_form[:title]}
-                    type="text"
-                    required
-                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
-                  />
-                </div>
+                <.input field={@edit_room_form[:title]} type="text" required label="Room Title" />
+
+                <.input
+                  field={@edit_room_form[:slug]}
+                  type="text"
+                  required
+                  label="Room Slug (URL identifier)"
+                />
 
                 <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Room Slug (URL identifier)</label>
-                  <.input
-                    field={@edit_room_form[:slug]}
-                    type="text"
-                    required
-                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Assigned Room Admin</label>
+                  <label
+                    for="configure-room-admin"
+                    class="block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 mb-2"
+                  >
+                    Assigned Room Admin
+                  </label>
                   <select
+                    id="configure-room-admin"
                     name="room[admin_id]"
-                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
+                    class="w-full h-10 px-3 rounded bg-transparent border border-line-strong text-sm text-ink focus:outline-none focus:border-ink transition-colors"
                   >
                     <option value="">Select Room Admin (Unassigned)...</option>
                     <%= for admin <- @room_admins do %>
@@ -284,36 +304,30 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                   </select>
                 </div>
 
-                <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Max Word Limit</label>
-                  <.input
-                    field={@edit_room_form[:word_limit]}
-                    type="number"
-                    required
-                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
-                  />
-                </div>
+                <.input
+                  field={@edit_room_form[:word_limit]}
+                  type="number"
+                  required
+                  label="Max Word Limit"
+                />
 
-                <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Intro / Description Text</label>
-                  <.input
-                    field={@edit_room_form[:intro_text]}
-                    type="textarea"
-                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm resize-none h-20"
-                  />
-                </div>
+                <.input
+                  field={@edit_room_form[:intro_text]}
+                  type="textarea"
+                  label="Intro / Description Text"
+                />
 
                 <div class="flex items-center justify-end gap-3 pt-2">
                   <button
                     type="button"
                     phx-click="close_configure_room"
-                    class="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600"
+                    class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    class="px-4 py-2 rounded-xl text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-white"
+                    class="inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
                   >
                     Save Changes
                   </button>
@@ -325,45 +339,53 @@ defmodule QaAppWeb.SuperAdminLive.Index do
 
         <!-- Create Room Modal -->
         <%= if @show_create_room_modal? do %>
-          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div class="bg-slate-800 border border-slate-700 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+            <div class="bg-paper border border-line-strong rounded-lg p-6 sm:p-8 max-w-md w-full space-y-5 relative">
               <button
                 phx-click="close_create_room"
-                class="absolute top-4 right-4 text-slate-400 hover:text-white"
+                aria-label="Close"
+                class="absolute top-3 right-3 w-9 h-9 rounded border border-transparent hover:border-line-strong flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
               >
-                <.icon name="hero-x-mark" class="w-6 h-6" />
+                <.icon name="hero-x-mark" class="size-5" />
               </button>
 
-              <h3 class="text-xl font-bold text-white">Create New Event Room</h3>
+              <div>
+                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                  Create Room
+                </p>
+                <h3 class="mt-2 text-xl font-semibold tracking-[-0.02em] text-ink">
+                  New Event Room
+                </h3>
+              </div>
 
               <.form for={@room_form} id="create-room-form" phx-submit="create_room" class="space-y-4">
-                <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Room Slug (URL identifier)</label>
-                  <.input
-                    field={@room_form[:slug]}
-                    type="text"
-                    placeholder="q4-townhall"
-                    required
-                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
-                  />
-                </div>
+                <.input
+                  field={@room_form[:slug]}
+                  type="text"
+                  placeholder="q4-townhall"
+                  required
+                  label="Room Slug (URL identifier)"
+                />
+
+                <.input
+                  field={@room_form[:title]}
+                  type="text"
+                  placeholder="All-Hands Q&A"
+                  required
+                  label="Event Title"
+                />
 
                 <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Event Title</label>
-                  <.input
-                    field={@room_form[:title]}
-                    type="text"
-                    placeholder="All-Hands Q&A"
-                    required
-                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Assign Room Admin</label>
+                  <label
+                    for="create-room-admin"
+                    class="block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 mb-2"
+                  >
+                    Assign Room Admin
+                  </label>
                   <select
+                    id="create-room-admin"
                     name="room[admin_id]"
-                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
+                    class="w-full h-10 px-3 rounded bg-transparent border border-line-strong text-sm text-ink focus:outline-none focus:border-ink transition-colors"
                   >
                     <option value="">Select Room Admin...</option>
                     <%= for admin <- @room_admins do %>
@@ -372,27 +394,24 @@ defmodule QaAppWeb.SuperAdminLive.Index do
                   </select>
                 </div>
 
-                <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Max Word Limit</label>
-                  <.input
-                    field={@room_form[:word_limit]}
-                    type="number"
-                    value="50"
-                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
-                  />
-                </div>
+                <.input
+                  field={@room_form[:word_limit]}
+                  type="number"
+                  value="50"
+                  label="Max Word Limit"
+                />
 
                 <div class="flex items-center justify-end gap-3 pt-2">
                   <button
                     type="button"
                     phx-click="close_create_room"
-                    class="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600"
+                    class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    class="px-4 py-2 rounded-xl text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-white"
+                    class="inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
                   >
                     Create Room
                   </button>
@@ -404,51 +423,53 @@ defmodule QaAppWeb.SuperAdminLive.Index do
 
         <!-- Create Admin Modal -->
         <%= if @show_create_admin_modal? do %>
-          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div class="bg-slate-800 border border-slate-700 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+            <div class="bg-paper border border-line-strong rounded-lg p-6 sm:p-8 max-w-md w-full space-y-5 relative">
               <button
                 phx-click="close_create_admin"
-                class="absolute top-4 right-4 text-slate-400 hover:text-white"
+                aria-label="Close"
+                class="absolute top-3 right-3 w-9 h-9 rounded border border-transparent hover:border-line-strong flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
               >
-                <.icon name="hero-x-mark" class="w-6 h-6" />
+                <.icon name="hero-x-mark" class="size-5" />
               </button>
 
-              <h3 class="text-xl font-bold text-white">Add Room Administrator Account</h3>
+              <div>
+                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                  Add Administrator
+                </p>
+                <h3 class="mt-2 text-xl font-semibold tracking-[-0.02em] text-ink">
+                  Room Admin Account
+                </h3>
+              </div>
 
               <.form :let={f} for={%{}} action="#" phx-submit="create_room_admin" class="space-y-4">
-                <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Username</label>
-                  <.input
-                    field={f[:username]}
-                    name="admin[username]"
-                    type="text"
-                    required
-                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
-                  />
-                </div>
+                <.input
+                  field={f[:username]}
+                  name="admin[username]"
+                  type="text"
+                  required
+                  label="Username"
+                />
 
-                <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Initial Password</label>
-                  <.input
-                    field={f[:password]}
-                    name="admin[password]"
-                    type="password"
-                    required
-                    class="w-full bg-slate-900 border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm"
-                  />
-                </div>
+                <.input
+                  field={f[:password]}
+                  name="admin[password]"
+                  type="password"
+                  required
+                  label="Initial Password"
+                />
 
                 <div class="flex items-center justify-end gap-3 pt-2">
                   <button
                     type="button"
                     phx-click="close_create_admin"
-                    class="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600"
+                    class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    class="px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white"
+                    class="inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
                   >
                     Create Account
                   </button>

@@ -119,147 +119,175 @@ defmodule QaAppWeb.AudienceLive.Show do
   def render(assigns) do
     ~H"""
     <QaAppWeb.Layouts.app flash={@flash}>
-      <div class="max-w-3xl mx-auto px-4 py-6 space-y-6">
-        <!-- Event Header Card -->
-        <div class="bg-slate-800/80 backdrop-blur-md rounded-2xl p-6 border border-slate-700/60 shadow-xl">
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Live Event
-              </span>
-              <h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">{@room.title}</h1>
+      <div class="max-w-5xl mx-auto px-6 pt-12 sm:pt-16 pb-24">
+        <!-- Masthead -->
+        <header class="border-b border-line pb-10">
+          <div class="grid grid-cols-12 gap-x-6 items-end">
+            <div class="col-span-12 lg:col-span-8">
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
+                <span class="w-2 h-2 rounded-full bg-accent motion-safe:animate-pulse"></span>
+                Live Event
+              </p>
+
+              <h1 class="mt-4 text-4xl sm:text-5xl font-semibold tracking-[-0.035em] leading-[1.03] text-ink">
+                {@room.title}
+              </h1>
+
+              <%= if @room.intro_text do %>
+                <p class="mt-4 text-[15px] leading-relaxed text-ink-2 max-w-xl">
+                  {@room.intro_text}
+                </p>
+              <% end %>
             </div>
-            <div class="text-right">
-              <span class="text-xs text-slate-400 uppercase tracking-wider block">Word Limit</span>
-              <span class="text-lg font-bold text-indigo-400">{@room.word_limit} words</span>
+
+            <div class="col-span-12 lg:col-span-4 lg:justify-self-end">
+              <div class="lg:text-right">
+                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">Word Limit</p>
+                <p class="mt-1.5 font-mono text-2xl tabular-nums text-ink">
+                  {@room.word_limit}
+                  <span class="text-sm text-ink-3">words</span>
+                </p>
+              </div>
             </div>
           </div>
-          <%= if @room.intro_text do %>
-            <p class="mt-3 text-slate-300 text-sm leading-relaxed border-t border-slate-700/40 pt-3">
-              {@room.intro_text}
-            </p>
-          <% end %>
-        </div>
+        </header>
 
         <!-- Submission Form or Submitted Confirmation -->
-        <div class="bg-slate-800/80 backdrop-blur-md rounded-2xl p-6 border border-slate-700/60 shadow-xl">
+        <section class="mt-12">
           <%= if @submitted? do %>
-            <div class="text-center py-4 space-y-2">
-              <div class="mx-auto w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-400 mb-2 border border-emerald-500/20">
-                <.icon name="hero-check-circle" class="w-7 h-7" />
-              </div>
-              <h3 class="text-lg font-bold text-white">Your Question Has Been Submitted</h3>
-              <p class="text-sm text-slate-400 max-w-md mx-auto">
-                "{@user_question.content}"
+            <div class="max-w-2xl">
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
+                <span class="w-2 h-2 bg-accent"></span> Question Submitted
               </p>
-              <p class="text-xs text-slate-500 pt-2">
-                You can ask 1 question per event. You can still upvote questions asked by others below!
+
+              <blockquote class="mt-5 border-l-2 border-ink pl-5 text-[19px] leading-relaxed tracking-[-0.01em] text-ink">
+                “{@user_question.content}”
+              </blockquote>
+
+              <p class="mt-4 text-[13px] leading-relaxed text-ink-3">
+                You can ask 1 question per event. You can still upvote questions asked by others
+                below.
               </p>
             </div>
           <% else %>
-            <h3 class="text-lg font-semibold text-white mb-3">Ask a Question Anonymously</h3>
-            <.form
-              for={@form}
-              id="question-form"
-              phx-change="validate_question"
-              phx-submit="submit_question"
-              class="space-y-4"
-            >
-              <div>
+            <div class="max-w-2xl">
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                Ask a Question Anonymously
+              </p>
+
+              <.form
+                for={@form}
+                id="question-form"
+                phx-change="validate_question"
+                phx-submit="submit_question"
+                class="mt-5"
+              >
                 <.input
                   id="question-content-input"
                   name={@form[:content].name}
                   value={@form[:content].value}
                   type="textarea"
                   placeholder="What would you like to ask?"
-                  class="w-full bg-slate-900/90 border-slate-700 text-white rounded-xl p-3.5 focus:border-indigo-500 focus:ring-indigo-500 resize-none h-28"
+                  class="w-full bg-transparent border-0 border-b border-line-strong rounded-none px-0 pt-2 pb-3 text-[17px] leading-relaxed text-ink placeholder:text-ink-3 resize-none h-28 focus:border-ink focus:outline-none transition-colors"
                 />
-              </div>
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <span class={[
-                    "px-2.5 py-1 rounded-lg text-xs font-bold border transition-all",
-                    if(@word_count > @room.word_limit,
-                      do: "bg-rose-500/20 text-rose-300 border-rose-500/40",
-                      else: "bg-slate-900 text-slate-300 border-slate-700"
-                    )
-                  ]}>
-                    {@word_count} / {@room.word_limit} words
-                  </span>
-                  <span class="text-xs text-slate-400">Anonymous submission</span>
+
+                <div class="mt-4 flex items-center justify-between gap-4">
+                  <div class="flex items-center gap-4">
+                    <span class={[
+                      "font-mono text-xs tabular-nums",
+                      if(@word_count > @room.word_limit,
+                        do: "text-danger",
+                        else: "text-ink-3"
+                      )
+                    ]}>
+                      {@word_count} / {@room.word_limit}
+                    </span>
+                    <span class="hidden sm:block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                      Anonymous submission
+                    </span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={@word_count > @room.word_limit}
+                    class="inline-flex items-center gap-2 h-10 px-5 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+                  >
+                    Submit <.icon name="hero-arrow-up-right" class="size-3.5" />
+                  </button>
                 </div>
-                <button
-                  type="submit"
-                  disabled={@word_count > @room.word_limit}
-                  class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <.icon name="hero-paper-airplane" class="w-4 h-4" /> Submit
-                </button>
-              </div>
-            </.form>
+              </.form>
+            </div>
           <% end %>
-        </div>
+        </section>
 
         <!-- Live Audience Questions Feed -->
-        <div class="space-y-4">
-          <div class="flex items-center justify-between px-1">
-            <h2 class="text-lg font-bold text-white flex items-center gap-2">
-              <.icon name="hero-chat-bubble-left-right" class="w-5 h-5 text-indigo-400" />
-              Audience Questions ({length(@questions)})
+        <section class="mt-14">
+          <div class="flex items-baseline justify-between gap-4 pb-3 border-b border-line">
+            <h2 class="text-lg font-semibold tracking-[-0.01em] text-ink">
+              Audience Questions
             </h2>
-            <span class="text-xs text-slate-400">Sorted by votes</span>
+            <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
+              {length(@questions)} open · Sorted by votes
+            </span>
           </div>
 
           <%= if Enum.empty?(@questions) do %>
-            <div class="bg-slate-800/40 rounded-2xl p-8 text-center border border-slate-700/40">
-              <.icon
-                name="hero-chat-bubble-bottom-center-text"
-                class="w-10 h-10 text-slate-500 mx-auto mb-2"
-              />
-              <p class="text-slate-400 font-medium">No questions asked yet.</p>
-              <p class="text-xs text-slate-500 mt-1">Be the first to submit a question!</p>
+            <div class="py-16 text-center">
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                No questions asked yet
+              </p>
+              <p class="mt-2 text-[13px] text-ink-3">Be the first to submit a question.</p>
             </div>
           <% else %>
-            <div id="questions-feed" class="space-y-3">
-              <%= for question <- @questions do %>
+            <div id="questions-feed">
+              <%= for {question, i} <- Enum.with_index(@questions) do %>
                 <div
                   id={"q-#{question.id}"}
-                  class="bg-slate-800/80 backdrop-blur-md rounded-2xl p-5 border border-slate-700/60 shadow-lg flex items-start gap-4 transition-all duration-200 hover:border-slate-600"
+                  class="grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-6 border-b border-line"
                 >
-                  <!-- Vote Button Column -->
-                  <button
-                    phx-click="toggle_vote"
-                    phx-value-id={question.id}
-                    class={[
-                      "flex flex-col items-center justify-center p-2.5 rounded-xl min-w-[54px] border transition-all duration-200",
-                      if(MapSet.member?(@user_voted_ids, question.id),
-                        do:
-                          "bg-indigo-600/20 border-indigo-500/50 text-indigo-400 shadow-md shadow-indigo-500/10",
-                        else:
-                          "bg-slate-900/60 border-slate-700/60 text-slate-400 hover:border-slate-500 hover:text-white"
-                      )
-                    ]}
-                  >
-                    <.icon name="hero-chevron-up" class="w-5 h-5" />
-                    <span class="text-sm font-bold mt-0.5">{question.vote_count}</span>
-                  </button>
+                  <div class="col-span-2 sm:col-span-1">
+                    <span class="hidden sm:block font-mono text-xs text-ink-3 tabular-nums">
+                      {i + 1}
+                    </span>
+                  </div>
 
-                  <!-- Content Column -->
-                  <div class="flex-1 min-w-0 pt-0.5">
-                    <p class="text-slate-100 text-base leading-relaxed break-words">
-                      {question.content}
-                    </p>
-                    <div class="mt-2 flex items-center gap-3 text-xs text-slate-400">
-                      <span>Anonymous</span>
-                      <span>•</span>
-                      <span>{Calendar.strftime(question.inserted_at, "%I:%M %p")}</span>
+                  <div class="col-span-10 sm:col-span-11 flex items-start gap-4">
+                    <button
+                      phx-click="toggle_vote"
+                      phx-value-id={question.id}
+                      aria-label="Upvote question"
+                      class={[
+                        "shrink-0 w-11 h-11 rounded border flex flex-col items-center justify-center gap-0.5 transition-colors duration-150",
+                        if(MapSet.member?(@user_voted_ids, question.id),
+                          do: "bg-ink border-ink text-paper",
+                          else: "border-line-strong text-ink-2 hover:border-ink hover:text-ink"
+                        )
+                      ]}
+                    >
+                      <.icon name="hero-chevron-up" class="size-4" />
+                      <span class="font-mono text-xs leading-none tabular-nums">
+                        {question.vote_count}
+                      </span>
+                    </button>
+
+                    <div class="flex-1 min-w-0 pt-0.5">
+                      <p class="text-[17px] leading-relaxed text-ink break-words">
+                        {question.content}
+                      </p>
+                      <div class="mt-2 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                        <span>Anonymous</span>
+                        <span class="text-ink-3/40">·</span>
+                        <span class="normal-case tracking-normal tabular-nums">
+                          {Calendar.strftime(question.inserted_at, "%I:%M %p")}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               <% end %>
             </div>
           <% end %>
-        </div>
+        </section>
       </div>
     </QaAppWeb.Layouts.app>
     """

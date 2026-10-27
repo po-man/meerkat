@@ -15,52 +15,74 @@ defmodule QaAppWeb.AdminLive.Dashboard do
 
   def render(assigns) do
     ~H"""
-    <QaAppWeb.Layouts.app flash={@flash}>
-      <div class="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <h1 class="text-3xl font-extrabold text-white">Your Event Rooms</h1>
-            <p class="text-sm text-slate-400 mt-1">
+    <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
+      <div class="max-w-5xl mx-auto px-6 pt-12 sm:pt-16 pb-24">
+        <header class="border-b border-line pb-8">
+          <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div>
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
+                <span class="w-2 h-2 bg-accent"></span> Moderator
+              </p>
+              <h1 class="mt-4 text-3xl sm:text-4xl font-semibold tracking-[-0.03em] leading-[1.05] text-ink">
+                Your Event Rooms
+              </h1>
+            </div>
+            <p class="text-sm leading-relaxed text-ink-2 md:max-w-xs md:text-right">
               Select an event room to moderate live questions.
             </p>
           </div>
-        </div>
+        </header>
 
         <%= if Enum.empty?(@rooms) do %>
-          <div class="bg-slate-800/40 rounded-2xl p-8 text-center border border-slate-700/40">
-            <.icon name="hero-rectangle-stack" class="w-12 h-12 text-slate-500 mx-auto mb-3" />
-            <p class="text-slate-300 font-semibold">No assigned rooms found.</p>
-            <p class="text-xs text-slate-500 mt-1">
+          <div class="py-16 text-center">
+            <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+              No assigned rooms found
+            </p>
+            <p class="mt-2 text-[13px] leading-relaxed text-ink-3">
               Contact your Super Administrator to create or assign a room to your account.
             </p>
           </div>
         <% else %>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <%= for room <- @rooms do %>
-              <div class="bg-slate-800/80 backdrop-blur-md rounded-2xl p-6 border border-slate-700/60 shadow-xl space-y-4 hover:border-indigo-500/50 transition-all">
-                <div class="flex items-start justify-between">
-                  <div>
-                    <h3 class="text-xl font-bold text-white">{room.title}</h3>
-                    <p class="text-xs text-indigo-400 font-medium">/r/{room.slug}</p>
-                  </div>
-                  <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    Active
+          <div>
+            <%= for {room, i} <- Enum.with_index(@rooms) do %>
+              <div class="group grid grid-cols-12 gap-x-4 sm:gap-x-6 items-center py-5 border-b border-line hover:bg-surface transition-colors">
+                <div class="col-span-1 hidden sm:block">
+                  <span class="font-mono text-xs text-ink-3 tabular-nums">{i + 1}</span>
+                </div>
+
+                <div class="col-span-11 sm:col-span-5 min-w-0">
+                  <h3 class="text-[17px] font-semibold tracking-[-0.01em] text-ink truncate">
+                    {room.title}
+                  </h3>
+                  <p class="mt-0.5 font-mono text-xs text-ink-3">/r/{room.slug}</p>
+                </div>
+
+                <div class="col-span-4 sm:col-span-2 flex sm:hidden">
+                  <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Active
                   </span>
                 </div>
 
-                <div class="flex items-center gap-3 pt-2">
+                <div class="col-span-4 sm:col-span-2 hidden sm:flex">
+                  <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Active
+                  </span>
+                </div>
+
+                <div class="col-span-8 sm:col-span-3 flex items-center justify-end gap-5">
                   <.link
                     navigate={~p"/admin/r/#{room.slug}"}
-                    class="flex-1 text-center py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all shadow-md"
+                    class="text-sm font-medium text-ink underline-offset-4 hover:underline transition-colors"
                   >
-                    Open Dashboard
+                    Open Dashboard →
                   </.link>
                   <.link
                     href={~p"/r/#{room.slug}"}
                     target="_blank"
-                    class="py-2.5 px-3 rounded-xl text-sm font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all border border-slate-600"
+                    aria-label="Open audience page in a new tab"
+                    class="w-9 h-9 rounded border border-line-strong flex items-center justify-center text-ink-2 hover:border-ink hover:text-ink transition-colors"
                   >
-                    <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
+                    <.icon name="hero-arrow-top-right-on-square" class="size-4" />
                   </.link>
                 </div>
               </div>

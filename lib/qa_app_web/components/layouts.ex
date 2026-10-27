@@ -27,6 +27,11 @@ defmodule QaAppWeb.Layouts do
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
 
+  attr :current_user, :map,
+    default: nil,
+    doc:
+      "the signed-in user (QaApp.Accounts.User). Pass it on auth-protected pages to show the user chip and Sign Out button"
+
   attr :current_scope, :map,
     default: nil,
     doc: "the current [scope](https://phoenix.hexdocs.pm/scopes.html)"
@@ -35,40 +40,37 @@ defmodule QaAppWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
-      <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <a href="/" class="flex items-center gap-2 text-white font-bold text-lg">
-          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
-            <.icon name="hero-chat-bubble-left-right" class="w-5 h-5 text-white" />
-          </div>
-          <span>Live Q&A</span>
-        </a>
+    <header class="sticky top-0 z-40 bg-paper border-b border-line">
+      <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+        <.link href={~p"/"} class="flex items-center gap-2.5 group">
+          <span class="w-2.5 h-2.5 bg-accent transition-transform duration-150 group-hover:scale-90"></span>
+          <span class="text-[15px] font-semibold tracking-[-0.02em] text-ink">Live Q&amp;A</span>
+        </.link>
 
-        <div class="flex items-center gap-3">
-          <%= if assigns[:current_user] do %>
-            <span class="text-xs text-slate-300 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
-              {assigns.current_user.username} ({assigns.current_user.role})
+        <div class="flex items-center gap-4">
+          <.theme_toggle />
+
+          <%= if @current_user do %>
+            <span class="hidden sm:flex items-center gap-2 font-mono text-xs text-ink-2">
+              {@current_user.username}
+              <span class="text-ink-3/60">/</span>
+              <span class="uppercase tracking-[0.14em] text-ink-3">{@current_user.role}</span>
             </span>
+
             <.link
+              id="sign-out"
               href={~p"/logout"}
               method="delete"
-              class="text-xs font-semibold text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all"
+              class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors underline-offset-4 hover:underline"
             >
               Sign Out
-            </.link>
-          <% else %>
-            <.link
-              href={~p"/login"}
-              class="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all"
-            >
-              Admin Login
             </.link>
           <% end %>
         </div>
       </div>
     </header>
 
-    <main class="min-h-[85vh] bg-slate-950 text-slate-100">
+    <main class="min-h-[calc(100vh-3.5rem)]">
       {render_slot(@inner_block)}
     </main>
 
@@ -83,7 +85,7 @@ defmodule QaAppWeb.Layouts do
 
       <.flash_group flash={@flash} />
   """
-  attr :flash, :map, required: true, doc: "the map of flash messages"
+  attr :flash, :map, required: true, doc: "the map of flash messages to display"
   attr :id, :string, default: "flash-group", doc: "the optional id of flash container"
 
   def flash_group(assigns) do
@@ -126,37 +128,43 @@ defmodule QaAppWeb.Layouts do
   end
 
   @doc """
-  Provides dark vs light theme toggle based on themes defined in app.css.
-
-  See <head> in root.html.heex which applies the theme before page load.
+  Provides light vs dark theme toggle based on the data-theme
+  attribute applied before paint in layouts/root.html.heex.
   """
   def theme_toggle(assigns) do
     ~H"""
-    <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full">
-      <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 [[data-theme-source=system]_&]:!left-0 transition-[left]" />
-
+    <div
+      class="flex items-stretch h-8 border border-line-strong rounded overflow-hidden"
+      aria-label="Theme"
+    >
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        type="button"
+        class="theme-opt theme-opt-system w-8 flex items-center justify-center cursor-pointer"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
+        aria-label="System theme"
       >
-        <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-computer-desktop-micro" class="size-4" />
       </button>
 
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        type="button"
+        class="theme-opt theme-opt-light w-8 flex items-center justify-center cursor-pointer border-l border-line-strong"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
+        aria-label="Light theme"
       >
-        <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-sun-micro" class="size-4" />
       </button>
 
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        type="button"
+        class="theme-opt theme-opt-dark w-8 flex items-center justify-center cursor-pointer border-l border-line-strong"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
+        aria-label="Dark theme"
       >
-        <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-moon-micro" class="size-4" />
       </button>
     </div>
     """

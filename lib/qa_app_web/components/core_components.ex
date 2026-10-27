@@ -2,29 +2,16 @@ defmodule QaAppWeb.CoreComponents do
   @moduledoc """
   Provides core UI components.
 
-  At first glance, this module may seem daunting, but its goal is to provide
-  core building blocks for your application, such as tables, forms, and
-  inputs. The components consist mostly of markup and are well-documented
-  with doc strings and declarative assigns. You may customize and style
-  them in any way you want, based on your application growth and needs.
+  The design system is a matte, editorial, Swiss-minimal language:
 
-  The foundation for styling is Tailwind CSS, a utility-first CSS framework,
-  augmented with daisyUI, a Tailwind CSS plugin that provides UI components
-  and themes. Here are useful references:
+    * Two-color warm monochrome (paper + ink) with a single clay accent,
+      exposed as semantic Tailwind utilities (`bg-paper`, `text-ink`,
+      `border-line`, `text-accent`, ...) defined in `assets/css/app.css`.
+    * Sharp geometry: 4px corners on controls, 8px on panels, 1px hairlines
+      for separation. No shadows, no gradients, no blur.
+    * Geist Sans for text, Geist Mono for meta, overlines, and numerals.
 
-    * [daisyUI](https://daisyui.com/docs/intro/) - a good place to get
-      started and see the available components.
-
-    * [Tailwind CSS](https://tailwindcss.com) - the foundational framework
-      we build on. You will use it for layout, sizing, flexbox, grid, and
-      spacing.
-
-    * [Heroicons](https://heroicons.com) - see `icon/1` for usage.
-
-    * [Phoenix.Component](https://phoenix-live-view.hexdocs.pm/Phoenix.Component.html) -
-      the component system used by Phoenix. Some components, such as `<.link>`
-      and `<.form>`, are defined there.
-
+  See `assets/css/app.css` for the token definitions.
   """
   use Phoenix.Component
   use Gettext, backend: QaAppWeb.Gettext
@@ -63,23 +50,29 @@ defmodule QaAppWeb.CoreComponents do
       id={@id}
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
-      class="toast toast-top toast-end z-50"
+      class="fixed top-4 right-4 z-50 w-80 max-w-[calc(100vw-2rem)]"
       {@rest}
     >
       <div class={[
-        "alert w-80 sm:w-96 max-w-80 sm:max-w-96 text-wrap",
-        @kind == :info && "alert-info",
-        @kind == :error && "alert-error"
+        "bg-paper border border-line-strong border-l-2 rounded p-3 flex items-start gap-2.5",
+        if(@kind == :info, do: "border-l-accent", else: "border-l-danger")
       ]}>
-        <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0" />
-        <div>
+        <.icon :if={@kind == :info} name="hero-information-circle" class="size-4 shrink-0 text-ink-2" />
+        <.icon
+          :if={@kind == :error}
+          name="hero-exclamation-circle"
+          class="size-4 shrink-0 text-danger"
+        />
+        <div class="flex-1 min-w-0 text-[13px] leading-snug text-ink">
           <p :if={@title} class="font-semibold">{@title}</p>
           <p>{msg}</p>
         </div>
-        <div class="flex-1" />
-        <button type="button" class="group self-start cursor-pointer" aria-label={gettext("close")}>
-          <.icon name="hero-x-mark" class="size-5 opacity-40 group-hover:opacity-70" />
+        <button
+          type="button"
+          class="shrink-0 text-ink-3 hover:text-ink transition-colors"
+          aria-label={gettext("close")}
+        >
+          <.icon name="hero-x-mark" class="size-4" />
         </button>
       </div>
     </div>
@@ -97,15 +90,23 @@ defmodule QaAppWeb.CoreComponents do
   """
   attr :rest, :global, include: ~w(href navigate patch method download name value disabled)
   attr :class, :any
-  attr :variant, :string, values: ~w(primary)
+  attr :variant, :string, values: ~w(primary ghost danger)
   slot :inner_block, required: true
 
   def button(%{rest: rest} = assigns) do
-    variants = %{"primary" => "btn-primary", nil => "btn-primary btn-soft"}
+    base =
+      "inline-flex items-center justify-center gap-2 h-10 px-4 rounded text-sm font-medium transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+
+    variants = %{
+      nil => base <> " bg-transparent border border-line-strong text-ink hover:border-ink",
+      "primary" => base <> " bg-ink text-paper hover:bg-accent",
+      "ghost" => base <> " bg-transparent border border-line-strong text-ink hover:border-ink",
+      "danger" => base <> " bg-transparent text-danger hover:underline"
+    }
 
     assigns =
       assign_new(assigns, :class, fn ->
-        ["btn", Map.fetch!(variants, assigns[:variant])]
+        [Map.fetch!(variants, assigns[:variant])]
       end)
 
     if rest[:href] || rest[:navigate] || rest[:patch] do
@@ -212,8 +213,8 @@ defmodule QaAppWeb.CoreComponents do
       end)
 
     ~H"""
-    <div class="fieldset mb-2">
-      <label for={@id}>
+    <div class="mb-2">
+      <label for={@id} class="flex items-center gap-2.5 cursor-pointer select-none text-sm text-ink">
         <input
           type="hidden"
           name={@name}
@@ -221,17 +222,16 @@ defmodule QaAppWeb.CoreComponents do
           disabled={@rest[:disabled]}
           form={@rest[:form]}
         />
-        <span class="label">
-          <input
-            type="checkbox"
-            id={@id}
-            name={@name}
-            value="true"
-            checked={@checked}
-            class={@class || "checkbox checkbox-sm"}
-            {@rest}
-          />{@label}
-        </span>
+        <input
+          type="checkbox"
+          id={@id}
+          name={@name}
+          value="true"
+          checked={@checked}
+          class={@class || "size-4 rounded-sm border border-line-strong"}
+          {@rest}
+        />
+        {@label}
       </label>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
@@ -240,20 +240,27 @@ defmodule QaAppWeb.CoreComponents do
 
   def input(%{type: "select"} = assigns) do
     ~H"""
-    <div class="fieldset mb-2">
-      <label for={@id}>
-        <span :if={@label} class="label mb-1">{@label}</span>
-        <select
-          id={@id}
-          name={@name}
-          class={[@class || "w-full select", @errors != [] && (@error_class || "select-error")]}
-          multiple={@multiple}
-          {@rest}
-        >
-          <option :if={@prompt} value="">{@prompt}</option>
-          {Phoenix.HTML.Form.options_for_select(@options, @value)}
-        </select>
+    <div class="mb-2">
+      <label
+        :if={@label}
+        for={@id}
+        class="block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 mb-2"
+      >
+        {@label}
       </label>
+      <select
+        id={@id}
+        name={@name}
+        class={[
+          @class || input_base_class() <> " h-10",
+          @errors != [] && (@error_class || "border-danger")
+        ]}
+        multiple={@multiple}
+        {@rest}
+      >
+        <option :if={@prompt} value="">{@prompt}</option>
+        {Phoenix.HTML.Form.options_for_select(@options, @value)}
+      </select>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
@@ -261,19 +268,23 @@ defmodule QaAppWeb.CoreComponents do
 
   def input(%{type: "textarea"} = assigns) do
     ~H"""
-    <div class="fieldset mb-2">
-      <label for={@id}>
-        <span :if={@label} class="label mb-1">{@label}</span>
-        <textarea
-          id={@id}
-          name={@name}
-          class={[
-            @class || "w-full textarea",
-            @errors != [] && (@error_class || "textarea-error")
-          ]}
-          {@rest}
-        >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
+    <div class="mb-2">
+      <label
+        :if={@label}
+        for={@id}
+        class="block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 mb-2"
+      >
+        {@label}
       </label>
+      <textarea
+        id={@id}
+        name={@name}
+        class={[
+          @class || input_base_class() <> " py-3 h-24 resize-none leading-relaxed",
+          @errors != [] && (@error_class || "border-danger")
+        ]}
+        {@rest}
+      >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
@@ -282,21 +293,25 @@ defmodule QaAppWeb.CoreComponents do
   # All other inputs text, datetime-local, url, password, etc. are handled here...
   def input(assigns) do
     ~H"""
-    <div class="fieldset mb-2">
-      <label for={@id}>
-        <span :if={@label} class="label mb-1">{@label}</span>
-        <input
-          type={@type}
-          name={@name}
-          id={@id}
-          value={Phoenix.HTML.Form.normalize_value(@type, @value)}
-          class={[
-            @class || "w-full input",
-            @errors != [] && (@error_class || "input-error")
-          ]}
-          {@rest}
-        />
+    <div class="mb-2">
+      <label
+        :if={@label}
+        for={@id}
+        class="block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 mb-2"
+      >
+        {@label}
       </label>
+      <input
+        type={@type}
+        name={@name}
+        id={@id}
+        value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+        class={[
+          @class || input_base_class() <> " h-10",
+          @errors != [] && (@error_class || "border-danger")
+        ]}
+        {@rest}
+      />
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
@@ -305,11 +320,16 @@ defmodule QaAppWeb.CoreComponents do
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""
-    <p class="mt-1.5 flex gap-2 items-center text-sm text-error">
-      <.icon name="hero-exclamation-circle" class="size-5" />
+    <p class="mt-1.5 flex gap-1.5 items-center text-xs text-danger">
+      <.icon name="hero-exclamation-circle" class="size-3.5 shrink-0" />
       {render_slot(@inner_block)}
     </p>
     """
+  end
+
+  # Shared base class for text-like inputs (select / textarea / text)
+  defp input_base_class do
+    "w-full bg-transparent border border-line-strong rounded px-3 text-sm text-ink placeholder:text-ink-3 transition-colors focus:outline-none focus:border-ink"
   end
 
   @doc """
@@ -321,12 +341,15 @@ defmodule QaAppWeb.CoreComponents do
 
   def header(assigns) do
     ~H"""
-    <header class={[@actions != [] && "flex items-center justify-between gap-6", "pb-4"]}>
+    <header class={[
+      @actions != [] && "flex items-center justify-between gap-6",
+      "pb-4 border-b border-line"
+    ]}>
       <div>
-        <h1 class="text-lg font-semibold leading-8">
+        <h2 class="text-xl font-semibold tracking-[-0.02em] text-ink">
           {render_slot(@inner_block)}
-        </h1>
-        <p :if={@subtitle != []} class="text-sm text-base-content/70">
+        </h2>
+        <p :if={@subtitle != []} class="mt-1 text-sm text-ink-2">
           {render_slot(@subtitle)}
         </p>
       </div>
@@ -367,26 +390,35 @@ defmodule QaAppWeb.CoreComponents do
       end
 
     ~H"""
-    <table class="table table-zebra">
+    <table class="w-full text-left text-sm">
       <thead>
         <tr>
-          <th :for={col <- @col}>{col[:label]}</th>
-          <th :if={@action != []}>
+          <th
+            :for={col <- @col}
+            class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap"
+          >
+            {col[:label]}
+          </th>
+          <th :if={@action != []} class="py-3 border-b border-line-strong text-right">
             <span class="sr-only">{gettext("Actions")}</span>
           </th>
         </tr>
       </thead>
       <tbody id={@id} phx-update={is_struct(@rows, Phoenix.LiveView.LiveStream) && "stream"}>
-        <tr :for={row <- @rows} id={@row_id && @row_id.(row)}>
+        <tr
+          :for={row <- @rows}
+          id={@row_id && @row_id.(row)}
+          class="border-b border-line hover:bg-surface transition-colors"
+        >
           <td
             :for={col <- @col}
             phx-click={@row_click && @row_click.(row)}
-            class={@row_click && "hover:cursor-pointer"}
+            class={[@row_click && "hover:cursor-pointer", "py-4 pr-4 align-top text-ink"]}
           >
             {render_slot(col, @row_item.(row))}
           </td>
-          <td :if={@action != []} class="w-0 font-semibold">
-            <div class="flex gap-4">
+          <td :if={@action != []} class="py-4 text-right align-top">
+            <div class="flex gap-3 justify-end">
               <%= for action <- @action do %>
                 {render_slot(action, @row_item.(row))}
               <% end %>
@@ -414,12 +446,10 @@ defmodule QaAppWeb.CoreComponents do
 
   def list(assigns) do
     ~H"""
-    <ul class="list">
-      <li :for={item <- @item} class="list-row">
-        <div class="list-col-grow">
-          <div class="font-bold">{item.title}</div>
-          <div>{render_slot(item)}</div>
-        </div>
+    <ul class="divide-y divide-line border-y border-line">
+      <li :for={item <- @item} class="py-3">
+        <div class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">{item.title}</div>
+        <div class="mt-1 text-sm text-ink">{render_slot(item)}</div>
       </li>
     </ul>
     """
