@@ -150,16 +150,6 @@ defmodule QaAppWeb.AudienceLive.Show do
                 </p>
               <% end %>
             </div>
-
-            <div class="col-span-12 lg:col-span-4 lg:justify-self-end">
-              <div class="lg:text-right">
-                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">Word Limit</p>
-                <p class="mt-1.5 font-mono text-2xl tabular-nums text-ink">
-                  {@room.word_limit}
-                  <span class="text-sm text-ink-3">words</span>
-                </p>
-              </div>
-            </div>
           </div>
         </header>
 
