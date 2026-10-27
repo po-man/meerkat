@@ -41,10 +41,8 @@ defmodule QaAppWeb.ExportController do
   def qr(conn, %{"slug" => slug}) do
     url = QaAppWeb.Endpoint.url() <> "/r/" <> slug
 
-    case QRCode.create(url) do
-      {:ok, qr} ->
-        png_binary = QRCode.render(qr)
-
+    case url |> QRCode.create() |> QRCode.render(:png) do
+      {:ok, png_binary} ->
         conn
         |> put_resp_content_type("image/png")
         |> send_resp(200, png_binary)
