@@ -106,10 +106,21 @@ defmodule QaAppWeb.AudienceLive.Show do
     {:noreply, assign(socket, :questions, questions)}
   end
 
-  def handle_info({:question_updated, _question}, socket) do
+  def handle_info({:question_updated, question}, socket) do
     room = socket.assigns.room
     questions = Engagement.list_active_questions(room.id)
-    {:noreply, assign(socket, :questions, questions)}
+
+    user_question =
+      if socket.assigns.user_question && socket.assigns.user_question.id == question.id do
+        question
+      else
+        socket.assigns.user_question
+      end
+
+    {:noreply,
+     socket
+     |> assign(:questions, questions)
+     |> assign(:user_question, user_question)}
   end
 
   def handle_info({:room_settings_updated, room}, socket) do
@@ -139,16 +150,6 @@ defmodule QaAppWeb.AudienceLive.Show do
                 </p>
               <% end %>
             </div>
-
-            <div class="col-span-12 lg:col-span-4 lg:justify-self-end">
-              <div class="lg:text-right">
-                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">Word Limit</p>
-                <p class="mt-1.5 font-mono text-2xl tabular-nums text-ink">
-                  {@room.word_limit}
-                  <span class="text-sm text-ink-3">words</span>
-                </p>
-              </div>
-            </div>
           </div>
         </header>
 
@@ -163,6 +164,40 @@ defmodule QaAppWeb.AudienceLive.Show do
               <blockquote class="mt-5 border-l-2 border-ink pl-5 text-[19px] leading-relaxed tracking-[-0.01em] text-ink">
                 “{@user_question.content}”
               </blockquote>
+
+              <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span
+                  id="user-question-status"
+                  class="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2"
+                >
+                  <span class={[
+                    "w-1.5 h-1.5 rounded-full",
+                    if(@user_question.is_asked, do: "bg-accent", else: "bg-ink")
+                  ]}></span>
+                  <%= if @user_question.is_asked do %>
+                    Asked
+                  <% else %>
+                    Raised
+                  <% end %>
+                </span>
+
+                <span class="text-ink-3/40">·</span>
+
+                <span
+                  id="user-question-vote-count"
+                  class="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2"
+                >
+                  <.icon name="hero-chevron-up" class="size-3.5" />
+                  <span class="tabular-nums">{@user_question.vote_count}</span>
+                  <span class="normal-case">
+                    <%= if @user_question.vote_count == 1 do %>
+                      upvote
+                    <% else %>
+                      upvotes
+                    <% end %>
+                  </span>
+                </span>
+              </div>
 
               <p class="mt-4 text-[13px] leading-relaxed text-ink-3">
                 You can ask 1 question per event. You can still upvote questions asked by others
@@ -222,11 +257,11 @@ defmodule QaAppWeb.AudienceLive.Show do
 
         <!-- Live Audience Questions Feed -->
         <section class="mt-14">
-          <div class="flex items-baseline justify-between gap-4 pb-3 border-b border-line">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 pb-3 border-b border-line">
             <h2 class="text-lg font-semibold tracking-[-0.01em] text-ink">
               Audience Questions
             </h2>
-            <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
+            <span class="w-full sm:w-auto font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
               {length(@questions)} open · Sorted by votes
             </span>
           </div>
@@ -241,45 +276,75 @@ defmodule QaAppWeb.AudienceLive.Show do
           <% else %>
             <div id="questions-feed">
               <%= for {question, i} <- Enum.with_index(@questions) do %>
+                <% own? = @user_question && @user_question.id == question.id %>
+
                 <div
                   id={"q-#{question.id}"}
-                  class="grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-6 border-b border-line"
+                  class={[
+                    "grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-6 border-b border-line",
+                    own? && "bg-surface -mx-2 sm:-mx-3 px-2 sm:px-3 rounded-lg"
+                  ]}
                 >
-                  <div class="col-span-2 sm:col-span-1">
-                    <span class="hidden sm:block font-mono text-xs text-ink-3 tabular-nums">
+                  <div class="col-span-1 sm:col-span-1">
+                    <span class={[
+                      "hidden sm:block font-mono text-xs tabular-nums",
+                      if(own?, do: "text-accent", else: "text-ink-3")
+                    ]}>
                       {i + 1}
                     </span>
                   </div>
 
                   <div class="col-span-10 sm:col-span-11 flex items-start gap-4">
-                    <button
-                      phx-click="toggle_vote"
-                      phx-value-id={question.id}
-                      aria-label="Upvote question"
-                      class={[
-                        "shrink-0 w-11 h-11 rounded border flex flex-col items-center justify-center gap-0.5 transition-colors duration-150",
-                        if(MapSet.member?(@user_voted_ids, question.id),
-                          do: "bg-ink border-ink text-paper",
-                          else: "border-line-strong text-ink-2 hover:border-ink hover:text-ink"
-                        )
-                      ]}
-                    >
-                      <.icon name="hero-chevron-up" class="size-4" />
-                      <span class="font-mono text-xs leading-none tabular-nums">
-                        {question.vote_count}
+                    <%= if own? do %>
+                      <span
+                        aria-label="Upvote count for your question"
+                        class="shrink-0 w-11 h-11 rounded border border-line-strong bg-transparent text-ink-3 flex flex-col items-center justify-center gap-0.5"
+                      >
+                        <.icon name="hero-chevron-up" class="size-4" />
+                        <span class="font-mono text-xs leading-none tabular-nums">
+                          {question.vote_count}
+                        </span>
                       </span>
-                    </button>
+                    <% else %>
+                      <button
+                        phx-click="toggle_vote"
+                        phx-value-id={question.id}
+                        aria-label="Upvote question"
+                        class={[
+                          "shrink-0 w-11 h-11 rounded border flex flex-col items-center justify-center gap-0.5 transition-colors duration-150",
+                          if(MapSet.member?(@user_voted_ids, question.id),
+                            do: "bg-ink border-ink text-paper",
+                            else: "border-line-strong text-ink-2 hover:border-ink hover:text-ink"
+                          )
+                        ]}
+                      >
+                        <.icon name="hero-chevron-up" class="size-4" />
+                        <span class="font-mono text-xs leading-none tabular-nums">
+                          {question.vote_count}
+                        </span>
+                      </button>
+                    <% end %>
 
                     <div class="flex-1 min-w-0 pt-0.5">
                       <p class="text-[17px] leading-relaxed text-ink break-words">
                         {question.content}
                       </p>
-                      <div class="mt-2 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                      <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
                         <span>Anonymous</span>
                         <span class="text-ink-3/40">·</span>
                         <span class="normal-case tracking-normal tabular-nums">
                           {Calendar.strftime(question.inserted_at, "%I:%M %p")}
                         </span>
+
+                        <%= if own? do %>
+                          <span class="text-ink-3/40">·</span>
+                          <span
+                            id={"your-question-#{question.id}"}
+                            class="inline-flex items-center gap-1.5 text-accent"
+                          >
+                            <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Your question
+                          </span>
+                        <% end %>
                       </div>
                     </div>
                   </div>

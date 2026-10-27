@@ -46,6 +46,30 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+// Auto-dismiss flash bubbles on dead-rendered (non-LiveView) pages, e.g. after
+// sign-out. LiveView-managed bubbles are handled by the colocated .FlashNotice hook.
+const FLASH_DISMISS_MS = 5000
+
+function dismissFlash(el) {
+  if (el.dataset.flashHandled) return
+  el.dataset.flashHandled = "true"
+
+  setTimeout(() => {
+    el.style.transition = "opacity 300ms ease, transform 300ms ease"
+    el.style.opacity = "0"
+    el.style.transform = "translateY(-6px)"
+    setTimeout(() => el.remove(), 300)
+  }, FLASH_DISMISS_MS)
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('[data-flash-autodismiss="true"]').forEach(el => {
+    // LiveView-managed bubbles (inside a live root) are handled by the
+    // colocated .FlashNotice hook, which also clears the server-side flash.
+    if (!el.closest("[data-phx-main]")) dismissFlash(el)
+  })
+})
+
 // The lines below enable quality of life phoenix_live_reload
 // development features:
 //

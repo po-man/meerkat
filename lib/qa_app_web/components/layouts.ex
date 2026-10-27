@@ -97,6 +97,7 @@ defmodule QaAppWeb.Layouts do
       <.flash
         id="client-error"
         kind={:error}
+        autodismiss={false}
         title={gettext("We can't find the internet")}
         phx-disconnected={
           show(".phx-client-error #client-error")
@@ -112,6 +113,7 @@ defmodule QaAppWeb.Layouts do
       <.flash
         id="server-error"
         kind={:error}
+        autodismiss={false}
         title={gettext("Something went wrong!")}
         phx-disconnected={
           show(".phx-server-error #server-error")
@@ -124,6 +126,53 @@ defmodule QaAppWeb.Layouts do
         <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
       </.flash>
     </div>
+    """
+  end
+
+  @doc """
+  Renders the moderator navigation tabs for a room: Questions and Settings.
+
+  Used by the moderator question feed page and the room settings page so
+  moderators can move between the two.
+  """
+  attr :room, QaApp.Events.Room, required: true
+  attr :active, :atom, required: true, values: [:questions, :settings]
+
+  def room_tabs(assigns) do
+    ~H"""
+    <nav
+      id="room-tabs"
+      class="flex items-center gap-1 border-b border-line"
+      aria-label="Moderator navigation"
+    >
+      <.link
+        id="room-tab-questions"
+        navigate={~p"/admin/r/#{@room.slug}"}
+        class={[
+          "inline-flex items-center h-10 px-3 sm:px-4 -mb-px border-b-2 transition-colors duration-150",
+          if(@active == :questions,
+            do: "border-ink text-ink",
+            else: "border-transparent text-ink-3 hover:text-ink hover:border-line-strong"
+          )
+        ]}
+      >
+        <span class="font-mono text-[11px] uppercase tracking-[0.14em]">Questions</span>
+      </.link>
+
+      <.link
+        id="room-tab-settings"
+        navigate={~p"/admin/r/#{@room.slug}/settings"}
+        class={[
+          "inline-flex items-center h-10 px-3 sm:px-4 -mb-px border-b-2 transition-colors duration-150",
+          if(@active == :settings,
+            do: "border-ink text-ink",
+            else: "border-transparent text-ink-3 hover:text-ink hover:border-line-strong"
+          )
+        ]}
+      >
+        <span class="font-mono text-[11px] uppercase tracking-[0.14em]">Settings</span>
+      </.link>
+    </nav>
     """
   end
 

@@ -20,15 +20,12 @@ defmodule QaAppWeb.AdminLive.Show do
             Events.subscribe_room(room.id)
           end
 
-          questions = Engagement.list_all_questions(room.id)
-          settings_form = to_form(Events.change_room(room))
-
           {:ok,
            socket
            |> assign(:room, room)
-           |> assign(:questions, questions)
-           |> assign(:settings_form, settings_form)
-           |> assign(:show_qr_modal?, false)}
+           |> assign(:show_qr_modal?, false)
+           |> assign(:tab, :raised)
+           |> load_questions()}
         else
           {:ok,
            socket
@@ -36,6 +33,14 @@ defmodule QaAppWeb.AdminLive.Show do
            |> redirect(to: "/")}
         end
     end
+  end
+
+  def handle_params(%{"tab" => "asked"}, _uri, socket) do
+    {:noreply, socket |> assign(:tab, :asked) |> load_questions()}
+  end
+
+  def handle_params(_params, _uri, socket) do
+    {:noreply, socket |> assign(:tab, :raised) |> load_questions()}
   end
 
   def handle_event("mark_asked", %{"id" => question_id}, socket) do
@@ -50,19 +55,15 @@ defmodule QaAppWeb.AdminLive.Show do
     end
   end
 
-  def handle_event("save_settings", %{"room" => room_params}, socket) do
-    room = socket.assigns.room
+  def handle_event("mark_unasked", %{"id" => question_id}, socket) do
+    question = Engagement.get_question!(question_id)
 
-    case Events.update_room(room, room_params) do
-      {:ok, updated_room} ->
-        {:noreply,
-         socket
-         |> assign(:room, updated_room)
-         |> assign(:settings_form, to_form(Events.change_room(updated_room)))
-         |> put_flash(:info, "Room settings updated successfully.")}
+    case Engagement.mark_as_unasked(question) do
+      {:ok, _updated_question} ->
+        {:noreply, socket}
 
-      {:error, changeset} ->
-        {:noreply, assign(socket, :settings_form, to_form(changeset))}
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to update question state.")}
     end
   end
 
@@ -71,13 +72,11 @@ defmodule QaAppWeb.AdminLive.Show do
   end
 
   def handle_info({:question_created, _question}, socket) do
-    questions = Engagement.list_all_questions(socket.assigns.room.id)
-    {:noreply, assign(socket, :questions, questions)}
+    {:noreply, load_questions(socket)}
   end
 
   def handle_info({:question_updated, _question}, socket) do
-    questions = Engagement.list_all_questions(socket.assigns.room.id)
-    {:noreply, assign(socket, :questions, questions)}
+    {:noreply, load_questions(socket)}
   end
 
   def handle_info({:room_settings_updated, room}, socket) do
@@ -109,118 +108,107 @@ defmodule QaAppWeb.AdminLive.Show do
               >
                 <.icon name="hero-qr-code" class="size-4" /> Share QR Code
               </button>
-
-              <.link
-                href={~p"/admin/r/#{@room.slug}/export.csv"}
-                target="_blank"
-                class="inline-flex items-center gap-2 h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
-              >
-                <.icon name="hero-arrow-down-tray" class="size-4" /> Export CSV
-              </.link>
             </div>
           </div>
         </header>
 
-        <div class="grid grid-cols-12 gap-x-8 lg:gap-x-12 mt-10">
-          <!-- Left Column: Room Settings Form -->
-          <section class="col-span-12 lg:col-span-4 lg:border-r lg:border-line lg:pr-10">
-            <h3 class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-              Event Settings
-            </h3>
+        <Layouts.room_tabs room={@room} active={:questions} />
 
-            <.form
-              for={@settings_form}
-              id="settings-form"
-              phx-submit="save_settings"
-              class="mt-6 space-y-5"
-            >
-              <div>
-                <.input field={@settings_form[:title]} type="text" label="Event Title" />
-              </div>
-
-              <div>
-                <.input field={@settings_form[:intro_text]} type="textarea" label="Intro Text" />
-              </div>
-
-              <div>
-                <.input
-                  field={@settings_form[:word_limit]}
-                  type="number"
-                  label="Max Word Limit per Question"
-                />
-              </div>
-
-              <button
-                type="submit"
-                class="w-full inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
+        <!-- Live Moderation Question Feed -->
+        <section class="mt-10">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 pb-3 border-b border-line">
+            <div id="admin-tabs" class="flex items-center gap-1 sm:gap-2">
+              <.link
+                id="admin-tab-raised"
+                patch={~p"/admin/r/#{@room.slug}?tab=raised"}
+                class={[
+                  "inline-flex items-center gap-2 h-9 px-3 sm:px-4 rounded transition-colors duration-150",
+                  if(@tab == :raised,
+                    do: "bg-ink text-paper",
+                    else: "text-ink-3 hover:text-ink hover:bg-surface"
+                  )
+                ]}
               >
-                Save Settings
-              </button>
-            </.form>
-          </section>
+                <span class="font-mono text-[11px] uppercase tracking-[0.14em]">
+                  Raised Questions
+                </span>
+                <span class={[
+                  "font-mono text-[11px] tabular-nums",
+                  if(@tab == :raised, do: "text-paper/60", else: "text-ink-3/60")
+                ]}>
+                  {length(@raised_questions)}
+                </span>
+              </.link>
 
-          <!-- Right Column: Live Moderation Question Feed -->
-          <section class="col-span-12 lg:col-span-8 mt-10 lg:mt-0">
-            <div class="flex items-baseline justify-between gap-4 pb-3 border-b border-line">
-              <h3 class="text-lg font-semibold tracking-[-0.01em] text-ink">
-                Questions
-              </h3>
-              <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
-                {length(@questions)} total · Sorted by votes
-              </span>
+              <.link
+                id="admin-tab-asked"
+                patch={~p"/admin/r/#{@room.slug}?tab=asked"}
+                class={[
+                  "inline-flex items-center gap-2 h-9 px-3 sm:px-4 rounded transition-colors duration-150",
+                  if(@tab == :asked,
+                    do: "bg-ink text-paper",
+                    else: "text-ink-3 hover:text-ink hover:bg-surface"
+                  )
+                ]}
+              >
+                <span class="font-mono text-[11px] uppercase tracking-[0.14em]">
+                  Asked Questions
+                </span>
+                <span class={[
+                  "font-mono text-[11px] tabular-nums",
+                  if(@tab == :asked, do: "text-paper/60", else: "text-ink-3/60")
+                ]}>
+                  {length(@asked_questions)}
+                </span>
+              </.link>
             </div>
 
-            <%= if Enum.empty?(@questions) do %>
-              <div class="py-16 text-center">
-                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                  No questions submitted yet
-                </p>
-              </div>
-            <% else %>
-              <div id="admin-questions-feed">
-                <%= for {question, i} <- Enum.with_index(@questions) do %>
-                  <div
-                    id={"admin-q-#{question.id}"}
-                    class={[
-                      "grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-5 border-b border-line",
-                      if(question.is_asked, do: "opacity-60")
-                    ]}
-                  >
-                    <div class="col-span-2 sm:col-span-1">
-                      <span class="font-mono text-xs text-ink-3 tabular-nums">{i + 1}</span>
-                    </div>
+            <span class="w-full sm:w-auto font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
+              {if(@tab == :raised, do: length(@raised_questions), else: length(@asked_questions))} total · Sorted by votes
+            </span>
+          </div>
 
-                    <div class="col-span-10 sm:col-span-11 flex items-start gap-4">
-                      <span class={[
-                        "shrink-0 w-11 py-2 rounded border flex flex-col items-center justify-center gap-0.5 font-mono text-xs tabular-nums",
-                        if(question.is_asked,
-                          do: "border-line text-ink-3",
-                          else: "border-line-strong text-ink"
-                        )
-                      ]}>
-                        <.icon name="hero-chevron-up" class="size-3.5" />
-                        {question.vote_count}
-                      </span>
+          <div id="admin-questions-feed">
+            <%= if @tab == :raised do %>
+              <div id="raised-questions-feed">
+                <%= if Enum.empty?(@raised_questions) do %>
+                  <div class="py-16 text-center">
+                    <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                      No raised questions yet
+                    </p>
+                    <p class="mt-2 text-[13px] text-ink-3">
+                      Questions submitted by the audience will appear here.
+                    </p>
+                  </div>
+                <% else %>
+                  <%= for {question, i} <- Enum.with_index(@raised_questions) do %>
+                    <div
+                      id={"admin-q-#{question.id}"}
+                      class="grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-5 border-b border-line"
+                    >
+                      <div class="col-span-1 sm:col-span-1">
+                        <span class="font-mono text-xs text-ink-3 tabular-nums">{i + 1}</span>
+                      </div>
 
-                      <div class="flex-1 min-w-0 pt-1">
-                        <p class="text-[16px] leading-relaxed text-ink break-words">
-                          {question.content}
-                        </p>
-                        <div class="mt-2 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                          <span class="normal-case tracking-normal tabular-nums">
-                            Submitted {Calendar.strftime(question.inserted_at, "%I:%M %p")}
-                          </span>
-                          <%= if question.is_asked do %>
-                            <span class="text-ink-2 flex items-center gap-1.5">
-                              <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Asked
+                      <div class="col-span-10 sm:col-span-8 flex items-start gap-4">
+                        <span class="shrink-0 w-11 py-2 rounded border border-line-strong text-ink flex flex-col items-center justify-center gap-0.5 font-mono text-xs tabular-nums">
+                          <.icon name="hero-chevron-up" class="size-3.5" />
+                          {question.vote_count}
+                        </span>
+
+                        <div class="flex-1 min-w-0 pt-1">
+                          <p class="text-[16px] leading-relaxed text-ink break-words">
+                            {question.content}
+                          </p>
+                          <div class="mt-2 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                            <span class="normal-case tracking-normal tabular-nums">
+                              Submitted {Calendar.strftime(question.inserted_at, "%I:%M %p")}
                             </span>
-                          <% end %>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div class="col-span-12 sm:col-span-3 flex sm:justify-end pt-3 sm:pt-1">
-                      <%= if not question.is_asked do %>
+                      <div class="col-span-12 sm:col-span-3 flex justify-end pt-3 sm:pt-1">
                         <button
                           phx-click="mark_asked"
                           phx-value-id={question.id}
@@ -228,18 +216,69 @@ defmodule QaAppWeb.AdminLive.Show do
                         >
                           <.icon name="hero-check" class="size-3.5" /> Mark as Asked
                         </button>
-                      <% else %>
-                        <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                          Asked
-                        </span>
-                      <% end %>
+                      </div>
                     </div>
+                  <% end %>
+                <% end %>
+              </div>
+            <% else %>
+              <div id="asked-questions-feed">
+                <%= if Enum.empty?(@asked_questions) do %>
+                  <div class="py-16 text-center">
+                    <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                      No asked questions yet
+                    </p>
+                    <p class="mt-2 text-[13px] text-ink-3">
+                      Questions you mark as asked will appear here.
+                    </p>
                   </div>
+                <% else %>
+                  <%= for {question, i} <- Enum.with_index(@asked_questions) do %>
+                    <div
+                      id={"admin-q-#{question.id}"}
+                      class="grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-5 border-b border-line"
+                    >
+                      <div class="col-span-2 sm:col-span-1">
+                        <span class="font-mono text-xs text-ink-3 tabular-nums">{i + 1}</span>
+                      </div>
+
+                      <div class="col-span-10 sm:col-span-8 flex items-start gap-4">
+                        <span class="shrink-0 w-11 py-2 rounded border border-line text-ink-3 flex flex-col items-center justify-center gap-0.5 font-mono text-xs tabular-nums">
+                          <.icon name="hero-chevron-up" class="size-3.5" />
+                          {question.vote_count}
+                        </span>
+
+                        <div class="flex-1 min-w-0 pt-1">
+                          <p class="text-[16px] leading-relaxed text-ink break-words">
+                            {question.content}
+                          </p>
+                          <div class="mt-2 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                            <span class="normal-case tracking-normal tabular-nums">
+                              Submitted {Calendar.strftime(question.inserted_at, "%I:%M %p")}
+                            </span>
+                            <span class="text-ink-2 flex items-center gap-1.5">
+                              <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Asked
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="col-span-12 sm:col-span-3 flex justify-end pt-3 sm:pt-1">
+                        <button
+                          phx-click="mark_unasked"
+                          phx-value-id={question.id}
+                          class="inline-flex items-center gap-1.5 h-8 px-3 rounded border border-line-strong bg-transparent text-ink-2 text-xs font-medium hover:border-ink hover:text-ink transition-colors duration-150"
+                        >
+                          <.icon name="hero-arrow-uturn-left" class="size-3.5" /> Move back
+                        </button>
+                      </div>
+                    </div>
+                  <% end %>
                 <% end %>
               </div>
             <% end %>
-          </section>
-        </div>
+          </div>
+        </section>
 
         <!-- QR Code Sharing Modal -->
         <%= if @show_qr_modal? do %>
@@ -280,5 +319,14 @@ defmodule QaAppWeb.AdminLive.Show do
       </div>
     </QaAppWeb.Layouts.app>
     """
+  end
+
+  defp load_questions(socket) do
+    room_id = socket.assigns.room.id
+
+    assign(socket,
+      raised_questions: Engagement.list_raised_questions(room_id),
+      asked_questions: Engagement.list_asked_questions(room_id)
+    )
   end
 end
