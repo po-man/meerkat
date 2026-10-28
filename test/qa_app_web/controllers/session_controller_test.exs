@@ -81,6 +81,30 @@ defmodule QaAppWeb.SessionControllerTest do
       refute Accounts.admin_exists?()
     end
 
+    test "rejects the former default access code when ADMIN_ACCESS_CODE is unset", %{conn: conn} do
+      # There must be no built-in fallback: when the access code is not
+      # configured, the old "secret123" default has to be rejected too.
+      previous = System.get_env("ADMIN_ACCESS_CODE")
+      System.delete_env("ADMIN_ACCESS_CODE")
+
+      on_exit(fn ->
+        case previous do
+          nil -> :ok
+          _ -> System.put_env("ADMIN_ACCESS_CODE", previous)
+        end
+      end)
+
+      conn =
+        post(conn, @secret_path, %{
+          "access_code" => "secret123",
+          "username" => "admin",
+          "password" => "secret123"
+        })
+
+      assert html_response(conn, 200) =~ "Invalid access code"
+      refute Accounts.admin_exists?()
+    end
+
     test "creates the admin and signs them in", %{conn: conn} do
       conn =
         post(conn, @secret_path, %{

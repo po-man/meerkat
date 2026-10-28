@@ -51,7 +51,7 @@ defmodule QaAppWeb.SessionController do
 
   defp create_admin(conn, params) do
     access_code = param(params, "access_code")
-    expected_code = System.get_env("ADMIN_ACCESS_CODE") || "secret123"
+    expected_code = System.get_env("ADMIN_ACCESS_CODE")
 
     if access_code && access_code == expected_code do
       attrs = %{

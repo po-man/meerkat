@@ -7,6 +7,41 @@ import Config
 # any compile-time configuration in here, as it won't be applied.
 # The block below contains prod specific runtime configuration.
 
+# This is skipped for :test so the test suite stays hermetic
+# (fresh checkouts / CI have no `.env`; tests set the variable explicitly).
+env_file = Path.expand("../.env", __DIR__)
+
+if config_env() != :test and File.exists?(env_file) do
+  env_file
+  |> File.read!()
+  |> String.split("\n")
+  |> Enum.each(fn raw_line ->
+    line = String.trim(raw_line)
+
+    if line != "" and not String.starts_with?(line, "#") do
+      case String.split(line, "=", parts: 2) do
+        [key, value] ->
+          key = String.trim(key)
+          value = value |> String.trim() |> String.trim("\"") |> String.trim("'")
+
+          if key != "" and System.get_env(key) == nil do
+            System.put_env(key, value)
+          end
+
+        _ ->
+          :ok
+      end
+    end
+  end)
+end
+
+if config_env() != :test and System.get_env("ADMIN_ACCESS_CODE") in [nil, ""] do
+  raise """
+  environment variable ADMIN_ACCESS_CODE is missing.
+  Set it in the `.env` file (see `.env.sample`) or export it before starting the server.
+  """
+end
+
 # ## Using releases
 #
 # If you use `mix release`, you need to explicitly enable the server

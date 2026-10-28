@@ -12,7 +12,7 @@ services:
       - PHX_HOST=${PHX_HOST:-qa.example.com}
       - SECRET_KEY_BASE=${SECRET_KEY_BASE:-generate_with_mix_phx_gen_secret}
       - DATABASE_PATH=/app/data/prod.sqlite3
-      - ADMIN_ACCESS_CODE=${ADMIN_ACCESS_CODE:-secret123}
+      - ADMIN_ACCESS_CODE=${ADMIN_ACCESS_CODE:?ADMIN_ACCESS_CODE must be set}
     volumes:
       - sqlite_data:/app/data
     expose:
