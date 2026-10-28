@@ -51,6 +51,9 @@ defmodule QaAppWeb.ModeratorLiveSettingsTest do
       assert has_element?(view, "#room-tab-questions")
       assert has_element?(view, ~s(a[href="/moderator/r/#{room.slug}/export.csv"]))
       assert render(view) =~ ~s(id="sign-out")
+      assert has_element?(view, "#room-expiry-local")
+      assert render(view) =~ ~s(data-format="datetime")
+      assert render(view) =~ ~s(phx-hook="LocalDateTime")
     end
 
     test "updates the room settings on submit", %{conn: conn, owner: owner, room: room} do

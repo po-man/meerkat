@@ -101,6 +101,8 @@ defmodule QaAppWeb.AdminLiveIndexTest do
 
       assert render(view) =~ "Expires"
       assert render(view) =~ Calendar.strftime(room.expires_at, "%b %d, %Y")
+      assert render(view) =~ ~s(data-format="datetime")
+      assert render(view) =~ ~s(phx-hook="LocalDateTime")
 
       view |> element(~s(button[phx-click="open_configure_room"])) |> render_click()
 

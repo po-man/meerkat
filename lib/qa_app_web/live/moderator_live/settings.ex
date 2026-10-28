@@ -57,12 +57,6 @@ defmodule QaAppWeb.ModeratorLive.Settings do
      |> assign(:settings_form, to_form(Events.change_room(room)))}
   end
 
-  defp format_expiry(%DateTime{} = expires_at) do
-    Calendar.strftime(expires_at, "%b %d, %Y %I:%M %p") <> " UTC"
-  end
-
-  defp format_expiry(_), do: "—"
-
   def render(assigns) do
     ~H"""
     <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
@@ -102,7 +96,7 @@ defmodule QaAppWeb.ModeratorLive.Settings do
               Room Expires
             </p>
             <p id="room-expiry" class="mt-1 text-sm text-ink tabular-nums">
-              {format_expiry(@room.expires_at)}
+              <.local_datetime id="room-expiry-local" datetime={@room.expires_at} />
             </p>
             <p class="mt-1 text-xs text-ink-3">
               Rooms are automatically cleaned up after their expiry. The expiry

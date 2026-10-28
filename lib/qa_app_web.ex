@@ -86,6 +86,8 @@ defmodule QaAppWeb do
       import Phoenix.HTML
       # Core UI components
       import QaAppWeb.CoreComponents
+      # Date-time rendering helpers
+      import QaAppWeb.DateTimeHelpers
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

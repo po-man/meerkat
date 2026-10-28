@@ -146,12 +146,6 @@ defmodule QaAppWeb.AdminLive.Index do
     {:noreply, assign(socket, :rooms, rooms)}
   end
 
-  defp format_expiry(%DateTime{} = expires_at) do
-    Calendar.strftime(expires_at, "%b %d, %Y %I:%M %p") <> " UTC"
-  end
-
-  defp format_expiry(_), do: "—"
-
   def render(assigns) do
     ~H"""
     <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
@@ -236,7 +230,7 @@ defmodule QaAppWeb.AdminLive.Index do
                       {room.char_limit} characters
                     </td>
                     <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
-                      {format_expiry(room.expires_at)}
+                      <.local_datetime id={"room-expiry-#{room.id}"} datetime={room.expires_at} />
                     </td>
                     <td class="py-4 align-top text-right whitespace-nowrap">
                       <div class="inline-flex items-center gap-4">

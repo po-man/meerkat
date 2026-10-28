@@ -29,6 +29,8 @@ defmodule QaAppWeb.AudienceLiveTest do
     assert html =~ "Is this anonymous"
     assert html =~ ~s(id="questions-feed")
     assert html =~ ~s(id="question-form")
+    assert html =~ ~s(data-format="time")
+    assert html =~ ~s(phx-hook="LocalDateTime")
   end
 
   describe "current user's submitted question" do

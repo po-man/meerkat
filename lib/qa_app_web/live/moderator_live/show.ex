@@ -202,7 +202,12 @@ defmodule QaAppWeb.ModeratorLive.Show do
                           </p>
                           <div class="mt-2 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
                             <span class="normal-case tracking-normal tabular-nums">
-                              Submitted {Calendar.strftime(question.inserted_at, "%I:%M %p")}
+                              Submitted
+                              <.local_datetime
+                                id={"submitted-at-#{question.id}"}
+                                datetime={question.inserted_at}
+                                format={:time}
+                              />
                             </span>
                           </div>
                         </div>
@@ -254,7 +259,12 @@ defmodule QaAppWeb.ModeratorLive.Show do
                           </p>
                           <div class="mt-2 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
                             <span class="normal-case tracking-normal tabular-nums">
-                              Submitted {Calendar.strftime(question.inserted_at, "%I:%M %p")}
+                              Submitted
+                              <.local_datetime
+                                id={"submitted-at-#{question.id}"}
+                                datetime={question.inserted_at}
+                                format={:time}
+                              />
                             </span>
                             <span class="text-ink-2 flex items-center gap-1.5">
                               <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Asked

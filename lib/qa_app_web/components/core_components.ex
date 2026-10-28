@@ -16,6 +16,8 @@ defmodule QaAppWeb.CoreComponents do
   use Phoenix.Component
   use Gettext, backend: QaAppWeb.Gettext
 
+  import QaAppWeb.DateTimeHelpers, only: [datetime_iso: 1]
+
   alias Phoenix.LiveView.JS
 
   @doc """
@@ -516,6 +518,61 @@ defmodule QaAppWeb.CoreComponents do
     <span class={[@name, @class]} />
     """
   end
+
+  @doc """
+  Renders a date-time in the viewer's local timezone.
+
+  The server renders the absolute UTC instant as an ISO-8601 string in a
+  `data-iso` attribute and a UTC-formatted fallback as the element body. The
+  `LocalDateTime` JS hook (see `assets/js/local_datetime.js`) replaces the
+  fallback with the same wording rendered in the viewer's local timezone.
+
+  ## Examples
+
+      <.local_datetime id="room-expiry" datetime={expires_at} />
+      <.local_datetime id={"q-time-\#{question.id}"} datetime={question.inserted_at} format={:time} class="tabular-nums" />
+  """
+  attr :datetime,
+       :any,
+       default: nil,
+       doc: "the UTC DateTime to render; nil renders a dash"
+
+  attr :format,
+       :atom,
+       values: [:time, :datetime],
+       default: :datetime,
+       doc: "the presentation to use for the local rendering"
+
+  attr :id, :string, required: true, doc: "the unique DOM id (required by the phx-hook)"
+
+  attr :class,
+       :string,
+       default: nil,
+       doc: "optional classes to add to the span"
+
+  def local_datetime(assigns) do
+    ~H"""
+    <span
+      id={@id}
+      data-iso={datetime_iso(@datetime)}
+      data-format={Atom.to_string(@format)}
+      phx-hook="LocalDateTime"
+      class={@class}
+    >
+      {local_datetime_fallback(@datetime, @format)}
+    </span>
+    """
+  end
+
+  defp local_datetime_fallback(%DateTime{} = datetime, :time) do
+    Calendar.strftime(datetime, "%I:%M %p") <> " UTC"
+  end
+
+  defp local_datetime_fallback(%DateTime{} = datetime, :datetime) do
+    Calendar.strftime(datetime, "%b %d, %Y %I:%M %p") <> " UTC"
+  end
+
+  defp local_datetime_fallback(_, _), do: "—"
 
   ## JS Commands
 

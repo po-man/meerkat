@@ -332,9 +332,12 @@ defmodule QaAppWeb.AudienceLive.Show do
                       <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
                         <span>Anonymous</span>
                         <span class="text-ink-3/40">·</span>
-                        <span class="normal-case tracking-normal tabular-nums">
-                          {Calendar.strftime(question.inserted_at, "%I:%M %p")}
-                        </span>
+                        <.local_datetime
+                          id={"question-time-#{question.id}"}
+                          datetime={question.inserted_at}
+                          format={:time}
+                          class="normal-case tracking-normal tabular-nums"
+                        />
 
                         <%= if own? do %>
                           <span class="text-ink-3/40">·</span>
