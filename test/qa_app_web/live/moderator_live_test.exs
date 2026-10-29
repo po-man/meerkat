@@ -96,7 +96,7 @@ defmodule QaAppWeb.ModeratorLiveTest do
       assert html =~ ~s(id="moderator-rooms")
     end
 
-    test "room dashboard shows a status switch that toggles the active state", %{
+    test "room dashboard shows a status switch that requires confirmation to deactivate", %{
       conn: conn,
       owner: owner,
       room: room
@@ -106,9 +106,35 @@ defmodule QaAppWeb.ModeratorLiveTest do
 
       assert has_element?(view, "#room-active-toggle-#{room.id}")
 
+      # First click only arms the confirmation; the room stays active.
       view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
+      assert Events.get_room!(room.id).is_active == true
+      assert has_element?(view, ~s(#row-#{room.id}-confirm))
+
+      # Confirming deactivates the room.
+      view
+      |> element(~s(#row-#{room.id}-confirm button[phx-click="confirm_room_inactive"]))
+      |> render_click()
 
       refute Events.get_room!(room.id).is_active
+    end
+
+    test "room dashboard opens an inactive room with a single click", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      room
+      |> Ecto.Changeset.change(is_active: false)
+      |> QaApp.Repo.update!()
+
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/dashboard")
+
+      view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
+
+      assert Events.get_room!(room.id).is_active == true
+      refute has_element?(view, ~s(#row-#{room.id}-confirm))
     end
 
     test "room dashboard live updates the status switch when the room changes elsewhere", %{
@@ -351,6 +377,137 @@ defmodule QaAppWeb.ModeratorLiveTest do
         Process.sleep(20)
         assert_eventually(fun, timeout - 20)
       end
+    end
+  end
+
+  describe "room open/close status on the questions page" do
+    setup do
+      {:ok, owner} =
+        Accounts.create_moderator(%{"username" => "status-owner", "password" => "secret123"})
+
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "status-room",
+          "title" => "Status Room",
+          "char_limit" => 320,
+          "is_active" => true,
+          "moderator_id" => owner.id
+        })
+
+      {:ok, owner: owner, room: room}
+    end
+
+    defp open_questions(conn, owner, slug) do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/r/#{slug}")
+      view
+    end
+
+    test "shows the open status pill and a guarded close trigger when active", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      view = open_questions(conn, owner, room.slug)
+
+      assert view |> element("#moderator-room-status") |> render() =~ "Open"
+      assert has_element?(view, "#close-room-trigger")
+      refute has_element?(view, "#room-not-open-banner")
+      refute has_element?(view, "#questions-confirm")
+    end
+
+    test "shows the not-open banner and opens the room with one click", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      room
+      |> Ecto.Changeset.change(is_active: false)
+      |> QaApp.Repo.update!()
+
+      view = open_questions(conn, owner, room.slug)
+
+      assert view |> element("#moderator-room-status") |> render() =~ "Not open"
+      assert has_element?(view, "#room-not-open-banner")
+      refute has_element?(view, "#close-room-trigger")
+
+      view |> element("#open-room-button") |> render_click()
+
+      assert Events.get_room!(room.id).is_active == true
+
+      assert_eventually(fn -> has_element?(view, "#close-room-trigger") end)
+      refute has_element?(view, "#room-not-open-banner")
+    end
+
+    test "requires confirmation before closing the room", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      view = open_questions(conn, owner, room.slug)
+
+      # First click arms the confirmation; the room stays open.
+      view |> element("#close-room-trigger") |> render_click()
+      assert Events.get_room!(room.id).is_active == true
+      assert has_element?(view, "#questions-confirm")
+
+      # Cancelling keeps the room open.
+      view
+      |> element(~s(#questions-confirm button[phx-click="cancel_room_inactive"]))
+      |> render_click()
+
+      assert has_element?(view, "#close-room-trigger")
+      refute has_element?(view, "#questions-confirm")
+      assert Events.get_room!(room.id).is_active == true
+
+      # Arming again and confirming closes the room.
+      view |> element("#close-room-trigger") |> render_click()
+      assert has_element?(view, "#questions-confirm")
+
+      view
+      |> element(~s(#questions-confirm button[phx-click="confirm_room_inactive"]))
+      |> render_click()
+
+      refute Events.get_room!(room.id).is_active
+
+      assert_eventually(fn -> has_element?(view, "#room-not-open-banner") end)
+      assert has_element?(view, "#open-room-button")
+    end
+
+    test "auto-cancels the armed close confirmation", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      view = open_questions(conn, owner, room.slug)
+
+      view |> element("#close-room-trigger") |> render_click()
+      assert has_element?(view, "#questions-confirm")
+
+      send(view.pid, :reset_room_confirm)
+      render(view)
+
+      refute has_element?(view, "#questions-confirm")
+      assert has_element?(view, "#close-room-trigger")
+      assert Events.get_room!(room.id).is_active == true
+    end
+
+    test "live updates the status when the room changes elsewhere", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      view = open_questions(conn, owner, room.slug)
+
+      assert view |> element("#moderator-room-status") |> render() =~ "Open"
+
+      {:ok, _} = Events.update_room(room, %{"is_active" => "false"})
+
+      assert_eventually(fn ->
+        view |> element("#moderator-room-status") |> render() =~ "Not open"
+      end)
+
+      assert_eventually(fn -> has_element?(view, "#room-not-open-banner") end)
     end
   end
 end

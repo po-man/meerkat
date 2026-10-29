@@ -2,8 +2,13 @@ defmodule QaAppWeb.ModeratorLive.Show do
   use QaAppWeb, :live_view
 
   alias QaApp.Engagement
+  alias QaApp.Events
   alias QaApp.RoomCapacity
   alias QaAppWeb.ModeratorLive.RoomAuth
+
+  # How long an armed "close room" confirmation stays open before it
+  # auto-cancels, protecting against an accidental close.
+  @deactivate_confirm_timeout 6_000
 
   def mount(params, _session, socket) do
     case RoomAuth.authorize(socket, params) do
@@ -12,6 +17,7 @@ defmodule QaAppWeb.ModeratorLive.Show do
          socket
          |> assign(:visitor_count, RoomCapacity.count(socket.assigns.room.id))
          |> assign(:show_qr_modal?, false)
+         |> assign(:confirm_deactivate_id, nil)
          |> assign(:tab, :raised)
          |> load_questions()}
 
@@ -21,11 +27,13 @@ defmodule QaAppWeb.ModeratorLive.Show do
   end
 
   def handle_params(%{"tab" => "asked"}, _uri, socket) do
-    {:noreply, socket |> assign(:tab, :asked) |> load_questions()}
+    {:noreply,
+     socket |> assign(:tab, :asked) |> assign(:confirm_deactivate_id, nil) |> load_questions()}
   end
 
   def handle_params(_params, _uri, socket) do
-    {:noreply, socket |> assign(:tab, :raised) |> load_questions()}
+    {:noreply,
+     socket |> assign(:tab, :raised) |> assign(:confirm_deactivate_id, nil) |> load_questions()}
   end
 
   def handle_event("mark_asked", %{"id" => question_id}, socket) do
@@ -40,12 +48,56 @@ defmodule QaAppWeb.ModeratorLive.Show do
     {:noreply, assign(socket, :show_qr_modal?, not socket.assigns.show_qr_modal?)}
   end
 
+  # Opening a room is a single click (the banner CTA); closing arms a
+  # confirmation so a moderator can't accidentally hide questions from
+  # visitors mid-moderation.
+  def handle_event("toggle_room_active", %{"id" => id}, socket) do
+    room = socket.assigns.room
+
+    if room.id == id && room.is_active do
+      Process.send_after(self(), :reset_room_confirm, @deactivate_confirm_timeout)
+      {:noreply, assign(socket, :confirm_deactivate_id, room.id)}
+    else
+      case update_room_status(socket, room, true) do
+        {:ok, socket} -> {:noreply, socket}
+        {:error, socket} -> {:noreply, socket}
+      end
+    end
+  end
+
+  def handle_event("confirm_room_inactive", %{"id" => id}, socket) do
+    room = socket.assigns.room
+
+    if room.id == id && room.is_active do
+      case update_room_status(socket, room, false) do
+        {:ok, socket} -> {:noreply, socket}
+        {:error, socket} -> {:noreply, socket}
+      end
+    else
+      {:noreply, assign(socket, :confirm_deactivate_id, nil)}
+    end
+  end
+
+  def handle_event("cancel_room_inactive", %{"id" => id}, socket) do
+    socket =
+      if socket.assigns[:confirm_deactivate_id] == id do
+        assign(socket, :confirm_deactivate_id, nil)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
   def handle_info({tag, _question}, socket) when tag in [:question_created, :question_updated] do
     {:noreply, load_questions(socket)}
   end
 
   def handle_info({:room_settings_updated, room}, socket) do
-    {:noreply, assign(socket, :room, room)}
+    {:noreply,
+     socket
+     |> assign(:room, room)
+     |> assign(:confirm_deactivate_id, nil)}
   end
 
   # Visitor presence changed (join/leave); refresh the live count.
@@ -56,6 +108,30 @@ defmodule QaAppWeb.ModeratorLive.Show do
   # Moderators are not visitors, so expulsions do not apply to this view.
   def handle_info({:room_visitors_expelled, _session_ids}, socket) do
     {:noreply, socket}
+  end
+
+  # The armed "close room" confirmation timed out; cancel it so an accidental
+  # close can't happen after the moderator walked away.
+  def handle_info(:reset_room_confirm, socket) do
+    {:noreply, assign(socket, :confirm_deactivate_id, nil)}
+  end
+
+  defp update_room_status(socket, room, is_active) do
+    case Events.update_room(room, %{"is_active" => is_active}) do
+      {:ok, updated_room} ->
+        {:ok,
+         socket
+         |> assign(:room, updated_room)
+         |> assign(:confirm_deactivate_id, nil)}
+
+      {:error, changeset} ->
+        errors = Enum.map_join(changeset.errors, ", ", fn {key, {msg, _}} -> "#{key} #{msg}" end)
+
+        {:error,
+         socket
+         |> assign(:confirm_deactivate_id, nil)
+         |> put_flash(:error, "Failed to update room status: #{errors}")}
+    end
   end
 
   def render(assigns) do
@@ -78,6 +154,33 @@ defmodule QaAppWeb.ModeratorLive.Show do
 
             <div class="flex items-center gap-3">
               <span
+                id="moderator-room-status"
+                class="inline-flex items-center gap-1.5 h-10 px-3 rounded border border-line-strong bg-transparent font-mono text-[11px] uppercase tracking-[0.14em] tabular-nums"
+              >
+                <span class={[
+                  "w-1.5 h-1.5 rounded-full",
+                  if(@room.is_active, do: "bg-accent motion-safe:animate-pulse", else: "bg-ink/50")
+                ]}></span>
+                <span class={if(@room.is_active, do: "text-ink-2", else: "text-ink-3")}>
+                  <%= if @room.is_active do %>
+                    Open
+                  <% else %>
+                    Not open
+                  <% end %>
+                </span>
+              </span>
+
+              <button
+                :if={@room.is_active && @confirm_deactivate_id != @room.id}
+                id="close-room-trigger"
+                phx-click="toggle_room_active"
+                phx-value-id={@room.id}
+                class="inline-flex items-center gap-1.5 h-10 px-3 rounded text-[13px] font-medium text-ink-3 hover:text-ink hover:bg-surface transition-colors duration-150"
+              >
+                <.icon name="hero-lock-closed" class="size-4" /> Close room
+              </button>
+
+              <span
                 id="moderator-visitor-count"
                 class="hidden sm:inline-flex items-center gap-1.5 h-10 px-3 rounded border border-line-strong bg-transparent font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums"
               >
@@ -98,6 +201,39 @@ defmodule QaAppWeb.ModeratorLive.Show do
             </div>
           </div>
         </header>
+
+        <%= if !@room.is_active do %>
+          <div
+            id="room-not-open-banner"
+            class="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded border border-line-strong px-4 py-3"
+          >
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="w-2 h-2 rounded-full bg-ink/50 shrink-0"></span>
+              <div class="min-w-0">
+                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2">
+                  Room is not open
+                </p>
+                <p class="mt-0.5 text-[13px] text-ink-3">
+                  Visitors see a waiting page and can't submit questions until you open the room.
+                </p>
+              </div>
+            </div>
+            <button
+              id="open-room-button"
+              phx-click="toggle_room_active"
+              phx-value-id={@room.id}
+              class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150 shrink-0"
+            >
+              <.icon name="hero-play" class="size-3.5" /> Open room
+            </button>
+          </div>
+        <% end %>
+
+        <%= if @confirm_deactivate_id == @room.id do %>
+          <div class="mt-6">
+            <.deactivate_confirm room={@room} id_prefix="questions" variant="strip" />
+          </div>
+        <% end %>
 
         <Layouts.room_tabs room={@room} active={:questions} />
 

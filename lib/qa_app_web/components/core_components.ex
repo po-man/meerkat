@@ -475,6 +475,85 @@ defmodule QaAppWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Renders the two-step confirmation shown before a room is deactivated.
+
+  It warns that visitors will be put on the waiting page and can't see
+  questions until the room is open again, and is used consistently by the
+  admin and moderator listings (`variant="inline"`) and the moderator
+  questions page (`variant="strip"`) so the wording and controls stay the
+  same everywhere. The buttons fire the shared `confirm_room_inactive` and
+  `cancel_room_inactive` events with the room's id.
+
+  ## Examples
+
+      <.deactivate_confirm room={room} id_prefix={"row-\#{room.id}"} />
+      <.deactivate_confirm room={room} variant="strip">
+        Custom copy for this surface.
+      </.deactivate_confirm>
+  """
+  attr :room, :map, required: true
+  attr :id_prefix, :string, default: "room-deactivate"
+  attr :variant, :string, values: ["inline", "strip"], default: "inline"
+  attr :confirm_event, :string, default: "confirm_room_inactive"
+  attr :cancel_event, :string, default: "cancel_room_inactive"
+
+  slot :inner_block
+
+  def deactivate_confirm(assigns) do
+    ~H"""
+    <div id={"#{@id_prefix}-confirm"} class="rounded border border-danger/40 bg-surface">
+      <div class={[
+        if(@variant == "strip",
+          do: "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3",
+          else: "flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2"
+        )
+      ]}>
+        <div class="flex items-start gap-2.5 min-w-0">
+          <span class="mt-0.5 shrink-0 w-1.5 h-1.5 rounded-full bg-danger"></span>
+          <div class="min-w-0">
+            <p
+              :if={@variant == "strip"}
+              class="font-mono text-[11px] uppercase tracking-[0.14em] text-danger"
+            >
+              Turn off this room?
+            </p>
+            <p class={[
+              "text-ink-2 leading-relaxed",
+              if(@variant == "strip", do: "mt-1 text-[13px]", else: "text-xs")
+            ]}>
+              <%= case render_slot(@inner_block) do %>
+                <% [] -> %>
+                  Visitors will see the waiting page and can't see questions until the room is open again.
+                <% content -> %>
+                  {content}
+              <% end %>
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            phx-click={@confirm_event}
+            phx-value-id={@room.id}
+            class="inline-flex items-center gap-1.5 h-8 px-3 rounded border border-danger/60 bg-transparent text-danger text-xs font-medium hover:bg-danger/10 transition-colors duration-150"
+          >
+            <.icon name="hero-lock-closed" class="size-3.5" /> Turn off room
+          </button>
+          <button
+            type="button"
+            phx-click={@cancel_event}
+            phx-value-id={@room.id}
+            class="inline-flex items-center h-8 px-3 rounded border border-line-strong bg-transparent text-ink-2 text-xs font-medium hover:border-ink hover:text-ink transition-colors duration-150"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""

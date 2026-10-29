@@ -3,12 +3,16 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
 
   alias QaApp.Events
 
+  # How long an armed "deactivate room" confirmation stays open before it
+  # auto-cancels, protecting against an accidental close.
+  @deactivate_confirm_timeout 6_000
+
   def mount(_params, _session, socket) do
     if connected?(socket) do
       Events.subscribe_rooms()
     end
 
-    {:ok, stream_rooms(socket)}
+    {:ok, socket |> assign(:confirm_deactivate_id, nil) |> stream_rooms()}
   end
 
   def handle_info({:room_expired, _room_id}, socket) do
@@ -16,15 +20,70 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
   end
 
   # A room's settings changed from another view (admin control center or the
-  # room settings tab). Refresh the rows so the status toggle stays live.
+  # room settings tab). Refresh the rows so the status toggle stays live, and
+  # clear any armed deactivation confirmation.
   def handle_info({:rooms_settings_updated, _room}, socket) do
-    {:noreply, stream_rooms(socket)}
+    {:noreply,
+     socket
+     |> assign(:confirm_deactivate_id, nil)
+     |> stream_rooms()}
+  end
+
+  # The armed "deactivate room" confirmation timed out; cancel it so an
+  # accidental close can't happen after the moderator walked away.
+  def handle_info(:reset_room_confirm, socket) do
+    {:noreply, socket |> assign(:confirm_deactivate_id, nil) |> stream_rooms()}
   end
 
   def handle_event("toggle_room_active", %{"id" => id}, socket) do
     room = Events.get_room!(id)
-    {:ok, _} = Events.update_room(room, %{"is_active" => !room.is_active})
+
+    # Opening a room is a single click; deactivating arms a confirmation so a
+    # moderator can't accidentally hide questions from visitors.
+    if room.is_active do
+      Process.send_after(self(), :reset_room_confirm, @deactivate_confirm_timeout)
+      {:noreply, socket |> assign(:confirm_deactivate_id, room.id) |> stream_rooms()}
+    else
+      case update_room_status(socket, room, true) do
+        {:ok, socket} -> {:noreply, stream_rooms(socket)}
+        {:error, socket} -> {:noreply, socket}
+      end
+    end
+  end
+
+  def handle_event("confirm_room_inactive", %{"id" => id}, socket) do
+    room = Events.get_room!(id)
+
+    case update_room_status(socket, room, false) do
+      {:ok, socket} -> {:noreply, stream_rooms(socket)}
+      {:error, socket} -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_room_inactive", %{"id" => id}, socket) do
+    socket =
+      if socket.assigns[:confirm_deactivate_id] == id do
+        assign(socket, :confirm_deactivate_id, nil)
+      else
+        socket
+      end
+
     {:noreply, stream_rooms(socket)}
+  end
+
+  defp update_room_status(socket, room, is_active) do
+    case Events.update_room(room, %{"is_active" => is_active}) do
+      {:ok, _updated_room} ->
+        {:ok, assign(socket, :confirm_deactivate_id, nil)}
+
+      {:error, changeset} ->
+        errors = Enum.map_join(changeset.errors, ", ", fn {key, {msg, _}} -> "#{key} #{msg}" end)
+
+        {:error,
+         socket
+         |> assign(:confirm_deactivate_id, nil)
+         |> put_flash(:error, "Failed to update room status: #{errors}")}
+    end
   end
 
   defp stream_rooms(socket) do
@@ -118,6 +177,12 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
                 <.icon name="hero-arrow-top-right-on-square" class="size-4" />
               </.link>
             </div>
+
+            <%= if @confirm_deactivate_id == room.id do %>
+              <div class="col-span-12 mt-2">
+                <.deactivate_confirm room={room} id_prefix={"row-#{room.id}"} />
+              </div>
+            <% end %>
           </div>
         </div>
       </div>
