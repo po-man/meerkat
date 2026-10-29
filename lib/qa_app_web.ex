@@ -86,6 +86,9 @@ defmodule QaAppWeb do
       import Phoenix.HTML
       # Core UI components
       import QaAppWeb.CoreComponents
+      # Shared presentational components
+      import QaAppWeb.Components.Modal
+      import QaAppWeb.Components.QuestionFeed
       # Date-time rendering helpers
       import QaAppWeb.DateTimeHelpers
 

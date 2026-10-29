@@ -264,24 +264,15 @@ defmodule QaAppWeb.AdminLive.Index do
 
         <!-- Configure Room Modal -->
         <%= if @show_configure_room_modal? do %>
-          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-            <div class="bg-paper border border-line-strong rounded-lg p-6 sm:p-8 max-w-md w-full space-y-5 relative">
-              <button
-                phx-click="close_configure_room"
-                aria-label="Close"
-                class="absolute top-3 right-3 w-9 h-9 rounded border border-transparent hover:border-line-strong flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
-              >
-                <.icon name="hero-x-mark" class="size-5" />
-              </button>
-
-              <div>
-                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                  Configure Room
-                </p>
-                <h3 class="mt-2 text-xl font-semibold tracking-[-0.02em] text-ink">
-                  Room Settings
-                </h3>
-              </div>
+          <.modal close_event="close_configure_room">
+            <div>
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                Configure Room
+              </p>
+              <h3 class="mt-2 text-xl font-semibold tracking-[-0.02em] text-ink">
+                Room Settings
+              </h3>
+            </div>
 
               <.form
                 for={@edit_room_form}
@@ -351,30 +342,20 @@ defmodule QaAppWeb.AdminLive.Index do
                   </button>
                 </div>
               </.form>
-            </div>
-          </div>
+          </.modal>
         <% end %>
 
         <!-- Create Room Modal -->
         <%= if @show_create_room_modal? do %>
-          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-            <div class="bg-paper border border-line-strong rounded-lg p-6 sm:p-8 max-w-md w-full space-y-5 relative">
-              <button
-                phx-click="close_create_room"
-                aria-label="Close"
-                class="absolute top-3 right-3 w-9 h-9 rounded border border-transparent hover:border-line-strong flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
-              >
-                <.icon name="hero-x-mark" class="size-5" />
-              </button>
-
-              <div>
-                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                  Create Room
-                </p>
-                <h3 class="mt-2 text-xl font-semibold tracking-[-0.02em] text-ink">
-                  New Event Room
-                </h3>
-              </div>
+          <.modal close_event="close_create_room">
+            <div>
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                Create Room
+              </p>
+              <h3 class="mt-2 text-xl font-semibold tracking-[-0.02em] text-ink">
+                New Event Room
+              </h3>
+            </div>
 
               <.form for={@room_form} id="create-room-form" phx-submit="create_room" class="space-y-4">
                 <.input
@@ -443,30 +424,20 @@ defmodule QaAppWeb.AdminLive.Index do
                   </button>
                 </div>
               </.form>
-            </div>
-          </div>
+          </.modal>
         <% end %>
 
         <!-- Create Moderator Modal -->
         <%= if @show_create_moderator_modal? do %>
-          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-            <div class="bg-paper border border-line-strong rounded-lg p-6 sm:p-8 max-w-md w-full space-y-5 relative">
-              <button
-                phx-click="close_create_moderator"
-                aria-label="Close"
-                class="absolute top-3 right-3 w-9 h-9 rounded border border-transparent hover:border-line-strong flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
-              >
-                <.icon name="hero-x-mark" class="size-5" />
-              </button>
-
-              <div>
-                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                  Add Moderator
-                </p>
-                <h3 class="mt-2 text-xl font-semibold tracking-[-0.02em] text-ink">
-                  Moderator Account
-                </h3>
-              </div>
+          <.modal close_event="close_create_moderator">
+            <div>
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                Add Moderator
+              </p>
+              <h3 class="mt-2 text-xl font-semibold tracking-[-0.02em] text-ink">
+                Moderator Account
+              </h3>
+            </div>
 
               <.form :let={f} for={%{}} action="#" phx-submit="create_moderator" class="space-y-4">
                 <.input
@@ -501,8 +472,7 @@ defmodule QaAppWeb.AdminLive.Index do
                   </button>
                 </div>
               </.form>
-            </div>
-          </div>
+          </.modal>
         <% end %>
       </div>
     </QaAppWeb.Layouts.app>
