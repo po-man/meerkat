@@ -13,7 +13,7 @@ defmodule QaApp.RoomExpirySchedulerTest do
     expired_room = insert_room!(%{slug: "boot-expired", expires_at: past})
     future_room = insert_room!(%{slug: "boot-future", expires_at: future})
 
-    pid = start_supervised!(RoomExpiryScheduler)
+    pid = start_scheduler()
 
     # Housekeeping removed the expired room...
     refute Repo.get(Room, expired_room.id)
@@ -25,7 +25,7 @@ defmodule QaApp.RoomExpirySchedulerTest do
   end
 
   test "force_check cleans expired rooms and re-arms the timer" do
-    pid = start_supervised!(RoomExpiryScheduler)
+    pid = start_scheduler()
 
     past = DateTime.add(DateTime.utc_now(), -60, :second)
     future = DateTime.add(DateTime.utc_now(), 3600, :second)
@@ -43,7 +43,7 @@ defmodule QaApp.RoomExpirySchedulerTest do
   end
 
   test "a room created with an earlier expiry re-arms the timer sooner" do
-    pid = start_supervised!(RoomExpiryScheduler)
+    pid = start_scheduler()
 
     later = DateTime.add(DateTime.utc_now(), 7200, :second) |> DateTime.truncate(:second)
     later_room = insert_room!(%{slug: "rearm-later", expires_at: later})
@@ -74,7 +74,7 @@ defmodule QaApp.RoomExpirySchedulerTest do
   end
 
   test "cleans up a room when its arming timer fires without a restart" do
-    start_supervised!(RoomExpiryScheduler)
+    start_scheduler()
 
     # Comfortably in the future so the scheduler always arms, even if the
     # `room_created` cast is slightly delayed (a +1s + truncate timestamp can
@@ -85,6 +85,16 @@ defmodule QaApp.RoomExpirySchedulerTest do
     assert :ok = RoomExpiryScheduler.room_created(room)
 
     assert wait_until(fn -> Repo.get(Room, room.id) == nil end, 15_000)
+  end
+
+  defp start_scheduler do
+    pid = start_supervised!(RoomExpiryScheduler)
+
+    # Let the scheduler reuse the test's sandboxed connection so it can see
+    # the rows created by this test.
+    Ecto.Adapters.SQL.Sandbox.allow(QaApp.Repo, self(), pid)
+
+    pid
   end
 
   defp wait_until(fun, timeout_ms) do
