@@ -12,6 +12,12 @@ defmodule QaAppWeb.AudienceLive.Show do
          |> put_flash(:error, "Event room not found")
          |> redirect(to: "/")}
 
+      %{is_active: false} ->
+        {:ok,
+         socket
+         |> put_flash(:error, "This event is no longer active.")
+         |> redirect(to: "/")}
+
       room ->
         if socket.assigns[:session_id] && connected?(socket) do
           Events.subscribe_room(room.id)

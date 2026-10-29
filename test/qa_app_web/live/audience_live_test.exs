@@ -45,6 +45,16 @@ defmodule QaAppWeb.AudienceLiveTest do
       assert has_element?(view, "#questions-feed[phx-update=stream]")
     end
 
+    test "redirects from an inactive room", %{conn: conn, room: room} do
+      room
+      |> Ecto.Changeset.change(is_active: false)
+      |> QaApp.Repo.update!()
+
+      conn = get(conn, ~p"/r/#{room.slug}")
+
+      assert redirected_to(conn) == "/"
+    end
+
     test "an upvote toggles the button's selected state", %{conn: conn, room: room} do
       {:ok, vote_question} =
         Engagement.create_question(room, "voter-session", %{"content" => "Toggle me"})
