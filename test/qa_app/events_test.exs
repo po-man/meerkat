@@ -76,6 +76,79 @@ defmodule QaApp.EventsTest do
     end
   end
 
+  describe "max_visitors" do
+    test "defaults to 250 when not provided" do
+      assert {:ok, room} =
+               Events.create_room(%{
+                 "slug" => "max-default",
+                 "title" => "Max Default",
+                 "expires_in" => "1 hour"
+               })
+
+      assert room.max_visitors == 250
+    end
+
+    test "accepts an explicit visitor limit" do
+      assert {:ok, room} =
+               Events.create_room(%{
+                 "slug" => "max-custom",
+                 "title" => "Max Custom",
+                 "expires_in" => "1 hour",
+                 "max_visitors" => "50"
+               })
+
+      assert room.max_visitors == 50
+    end
+
+    test "treats an empty value as unlimited" do
+      assert {:ok, room} =
+               Events.create_room(%{
+                 "slug" => "max-unlimited",
+                 "title" => "Max Unlimited",
+                 "expires_in" => "1 hour",
+                 "max_visitors" => ""
+               })
+
+      assert is_nil(room.max_visitors)
+    end
+
+    test "rejects limits below 1" do
+      assert {:error, changeset} =
+               Events.create_room(%{
+                 "slug" => "max-zero",
+                 "title" => "Max Zero",
+                 "expires_in" => "1 hour",
+                 "max_visitors" => "0"
+               })
+
+      assert %{max_visitors: ["must be at least 1"]} = errors_on(changeset)
+    end
+
+    test "rejects negative limits" do
+      assert {:error, changeset} =
+               Events.create_room(%{
+                 "slug" => "max-negative",
+                 "title" => "Max Negative",
+                 "expires_in" => "1 hour",
+                 "max_visitors" => "-5"
+               })
+
+      assert %{max_visitors: ["must be at least 1"]} = errors_on(changeset)
+    end
+
+    test "rejects non numeric values" do
+      assert {:error, changeset} =
+               Events.create_room(%{
+                 "slug" => "max-invalid",
+                 "title" => "Max Invalid",
+                 "expires_in" => "1 hour",
+                 "max_visitors" => "lots"
+               })
+
+      assert %{max_visitors: ["is invalid"]} = errors_on(changeset)
+    end
+  end
+
   describe "cleanup_expired_rooms/0" do
     test "deletes only rooms whose expiry is in the past" do
       past = DateTime.add(DateTime.utc_now(), -60, :second)

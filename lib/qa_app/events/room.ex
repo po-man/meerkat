@@ -27,11 +27,16 @@ defmodule QaApp.Events.Room do
     "7 days" => 7 * 24 * 60
   }
 
+  # The default maximum concurrent visitors for a new room. nil is allowed and
+  # means "unlimited".
+  @default_max_visitors 250
+
   schema "events_rooms" do
     field :slug, :string
     field :title, :string, default: "Live Q&A"
     field :intro_text, :string
     field :char_limit, :integer, default: 320
+    field :max_visitors, :integer, default: @default_max_visitors
     field :is_active, :boolean, default: true
     field :expires_at, :utc_datetime
     field :expires_in, :string, virtual: true
@@ -45,21 +50,44 @@ defmodule QaApp.Events.Room do
   @doc "The allowed expiry duration labels offered when creating a room."
   def expiry_options, do: @expiry_options
 
+  @doc "The default maximum concurrent visitors used when creating a room."
+  def default_max_visitors, do: @default_max_visitors
+
   @doc """
   Changeset for updating a room. Room expiry is locked at creation time and
   is intentionally not castable here, so it cannot be changed afterwards.
   """
   def changeset(room, attrs) do
     room
-    |> cast(attrs, [:slug, :title, :intro_text, :char_limit, :is_active, :moderator_id])
+    |> cast(normalize_max_visitors(attrs), [
+      :slug,
+      :title,
+      :intro_text,
+      :char_limit,
+      :max_visitors,
+      :is_active,
+      :moderator_id
+    ])
     |> validate_required([:slug, :title, :char_limit, :is_active])
     |> validate_number(:char_limit, greater_than: 0, less_than_or_equal_to: 1000)
+    # nil (empty input) is allowed and means unlimited; otherwise must be >= 1.
+    |> validate_number(:max_visitors, greater_than: 0, message: "must be at least 1")
     |> validate_format(:slug, ~r/^[a-z0-9\-]+$/,
       message: "must contain only lowercase letters, numbers, and hyphens"
     )
     |> validate_length(:slug, min: 2, max: 100)
     |> unique_constraint(:slug)
   end
+
+  # An empty input means "unlimited". Ecto would otherwise silently drop the
+  # empty-string change (leaving the struct default), so normalize it to nil.
+  defp normalize_max_visitors(%{"max_visitors" => ""} = attrs),
+    do: Map.put(attrs, "max_visitors", nil)
+
+  defp normalize_max_visitors(%{max_visitors: ""} = attrs),
+    do: Map.put(attrs, :max_visitors, nil)
+
+  defp normalize_max_visitors(attrs), do: attrs
 
   @doc """
   Changeset used when creating a room. Requires picking one of the allowed
