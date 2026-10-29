@@ -271,4 +271,39 @@ defmodule QaAppWeb.ModeratorLiveTest do
       assert has_element?(view, "#room-tab-settings")
     end
   end
+
+  describe "live visitor count" do
+    setup do
+      {:ok, owner} =
+        Accounts.create_moderator(%{"username" => "count-owner", "password" => "secret123"})
+
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "count-room",
+          "title" => "Count Room",
+          "char_limit" => 320,
+          "is_active" => true,
+          "max_visitors" => "200",
+          "moderator_id" => owner.id
+        })
+
+      {:ok, owner: owner, room: room}
+    end
+
+    test "shows the live visitor count and capacity on the room page", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}")
+
+      assert has_element?(view, "#moderator-visitor-count")
+
+      html = view |> element("#moderator-visitor-count") |> render()
+      assert html =~ "0"
+      assert html =~ "live"
+      assert html =~ "200"
+    end
+  end
 end

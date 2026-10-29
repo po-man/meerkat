@@ -3,6 +3,7 @@ defmodule QaAppWeb.AudienceLive.Show do
 
   alias QaApp.Events
   alias QaApp.Engagement
+  alias QaApp.RoomCapacity
 
   def mount(%{"slug" => slug}, _session, socket) do
     case Events.get_room_by_slug(slug) do
@@ -19,31 +20,43 @@ defmodule QaAppWeb.AudienceLive.Show do
          |> redirect(to: "/")}
 
       room ->
-        if socket.assigns[:session_id] && connected?(socket) do
-          Events.subscribe_room(room.id)
-        end
-
         session_id = socket.assigns[:session_id]
-        user_voted_ids = Engagement.list_user_voted_question_ids(room.id, session_id)
-        user_question = Engagement.get_question_by_session(room.id, session_id)
 
-        form =
-          if user_question do
-            nil
-          else
-            Engagement.change_question(room, session_id, %{"content" => ""})
-            |> to_form()
-          end
+        case RoomCapacity.join(socket, room, session_id) do
+          :full ->
+            {:ok,
+             socket
+             |> put_flash(:error, "This room is currently at full capacity.")
+             |> redirect(to: ~p"/r/#{room.slug}/full")}
 
-        {:ok,
-         socket
-         |> assign(:room, room)
-         |> questions_stream()
-         |> assign(:user_voted_ids, user_voted_ids)
-         |> assign(:user_question, user_question)
-         |> assign(:form, form)
-         |> assign(:char_count, 0)
-         |> assign(:submitted?, not is_nil(user_question))}
+          :ok ->
+            if connected?(socket) do
+              Events.subscribe_room(room.id)
+            end
+
+            visitor_count = RoomCapacity.count(room.id)
+            user_voted_ids = Engagement.list_user_voted_question_ids(room.id, session_id)
+            user_question = Engagement.get_question_by_session(room.id, session_id)
+
+            form =
+              if user_question do
+                nil
+              else
+                Engagement.change_question(room, session_id, %{"content" => ""})
+                |> to_form()
+              end
+
+            {:ok,
+             socket
+             |> assign(:room, room)
+             |> assign(:visitor_count, visitor_count)
+             |> questions_stream()
+             |> assign(:user_voted_ids, user_voted_ids)
+             |> assign(:user_question, user_question)
+             |> assign(:form, form)
+             |> assign(:char_count, 0)
+             |> assign(:submitted?, not is_nil(user_question))}
+        end
     end
   end
 
@@ -113,6 +126,21 @@ defmodule QaAppWeb.AudienceLive.Show do
     {:noreply, questions_stream(socket)}
   end
 
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    {:noreply, assign(socket, :visitor_count, RoomCapacity.count(socket.assigns.room.id))}
+  end
+
+  def handle_info({:room_visitors_expelled, session_ids}, socket) do
+    if socket.assigns[:session_id] in session_ids do
+      {:noreply,
+       socket
+       |> put_flash(:error, "This room is now at full capacity.")
+       |> redirect(to: ~p"/r/#{socket.assigns.room.slug}/full")}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_info({:question_updated, question}, socket) do
     user_question =
       if socket.assigns.user_question && socket.assigns.user_question.id == question.id do
@@ -156,10 +184,20 @@ defmodule QaAppWeb.AudienceLive.Show do
         <header class="border-b border-line pb-10">
           <div class="grid grid-cols-12 gap-x-6 items-end">
             <div class="col-span-12 lg:col-span-8">
-              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
-                <span class="w-2 h-2 rounded-full bg-accent motion-safe:animate-pulse"></span>
-                Live Event
-              </p>
+              <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
+                  <span class="w-2 h-2 rounded-full bg-accent motion-safe:animate-pulse"></span>
+                  Live Event
+                </p>
+
+                <span
+                  id="visitor-count"
+                  class="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-accent/70"></span>
+                  {@visitor_count} attending
+                </span>
+              </div>
 
               <h1 class="mt-4 text-4xl sm:text-5xl font-semibold tracking-[-0.035em] leading-[1.03] text-ink">
                 {@room.title}

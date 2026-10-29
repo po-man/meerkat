@@ -4,6 +4,7 @@ defmodule QaAppWeb.AdminLive.Index do
   alias QaApp.Events
   alias QaApp.Events.Room
   alias QaApp.Accounts
+  alias QaApp.RoomCapacity
 
   def mount(_params, _session, socket) do
     users = Accounts.list_users()
@@ -32,6 +33,25 @@ defmodule QaAppWeb.AdminLive.Index do
   def handle_info({:room_expired, _room_id}, socket) do
     {:noreply, stream_rooms(socket)}
   end
+
+  # A visitor joined or left a room; refresh that room's live count.
+  def handle_info(
+        %Phoenix.Socket.Broadcast{event: "presence_diff", topic: "room:" <> room_id},
+        socket
+      ) do
+    visitor_counts = Map.put(socket.assigns.visitor_counts, room_id, RoomCapacity.count(room_id))
+
+    {:noreply,
+     socket
+     |> assign(:visitor_counts, visitor_counts)
+     |> assign(:total_visitors, Enum.sum(Map.values(visitor_counts)))}
+  end
+
+  # The admin is subscribed to the room topics for presence diffs, so it also
+  # sees the app's plain broadcasts; these are already reflected via the rooms
+  # list and are otherwise irrelevant here.
+  def handle_info({:room_settings_updated, _room}, socket), do: {:noreply, socket}
+  def handle_info({:room_visitors_expelled, _session_ids}, socket), do: {:noreply, socket}
 
   def handle_event("open_create_room", _, socket) do
     {:noreply, assign(socket, :show_create_room_modal?, true)}
@@ -158,6 +178,14 @@ defmodule QaAppWeb.AdminLive.Index do
             </div>
 
             <div class="flex items-center gap-3">
+              <span
+                id="total-live-visitors"
+                class="hidden sm:inline-flex items-center gap-2 h-10 px-3 rounded border border-line-strong bg-transparent font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-accent motion-safe:animate-pulse"></span>
+                {@total_visitors} live
+              </span>
+
               <button
                 phx-click="open_create_moderator"
                 class="inline-flex items-center gap-2 h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
@@ -198,6 +226,9 @@ defmodule QaAppWeb.AdminLive.Index do
                     Character Limit
                   </th>
                   <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
+                    Live Visitors
+                  </th>
+                  <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
                     Expires
                   </th>
                   <th class="py-3 border-b border-line-strong text-right">
@@ -224,6 +255,18 @@ defmodule QaAppWeb.AdminLive.Index do
                   </td>
                   <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
                     {room.char_limit} characters
+                  </td>
+                  <td class="py-4 pr-4 align-top">
+                    <span
+                      id={"room-live-#{room.id}"}
+                      class="inline-flex items-center gap-1.5 font-mono text-xs tabular-nums text-ink-2"
+                    >
+                      <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+                      {Map.get(@visitor_counts, room.id, 0)}
+                      <%= if room.max_visitors do %>
+                        <span class="text-ink-3">/ {room.max_visitors}</span>
+                      <% end %>
+                    </span>
                   </td>
                   <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
                     <.local_datetime id={"room-expiry-#{room.id}"} datetime={room.expires_at} />
@@ -318,6 +361,17 @@ defmodule QaAppWeb.AdminLive.Index do
               />
 
               <.input
+                field={@edit_room_form[:max_visitors]}
+                type="number"
+                min="1"
+                label="Max Concurrent Visitors"
+              />
+              <p class="mt-1 text-xs leading-relaxed text-ink-3">
+                Leave empty for unlimited. Existing visitors are removed
+                (newest first) if you lower this below the current count.
+              </p>
+
+              <.input
                 field={@edit_room_form[:intro_text]}
                 type="textarea"
                 label="Intro / Description Text"
@@ -395,6 +449,14 @@ defmodule QaAppWeb.AdminLive.Index do
                 type="number"
                 value="320"
                 label="Max Character Limit"
+              />
+
+              <.input
+                field={@room_form[:max_visitors]}
+                type="number"
+                min="1"
+                placeholder="250"
+                label="Max Concurrent Visitors"
               />
 
               <.input
@@ -481,9 +543,31 @@ defmodule QaAppWeb.AdminLive.Index do
 
   defp stream_rooms(socket) do
     rooms = Events.list_rooms()
+    socket = sync_presence_subscriptions(socket, rooms)
+    visitor_counts = Map.new(rooms, &{&1.id, RoomCapacity.count(&1.id)})
 
     socket
     |> assign(:rooms_count, length(rooms))
+    |> assign(:visitor_counts, visitor_counts)
+    |> assign(:total_visitors, Enum.sum(Map.values(visitor_counts)))
     |> stream(:rooms, rooms, dom_id: &("room-" <> &1.id), reset: true)
+  end
+
+  # Keeps the admin LiveView subscribed to each room's presence topic so live
+  # visitor counts stay in sync, subscribing to new rooms and unsubscribing
+  # from removed/deleted ones.
+  defp sync_presence_subscriptions(socket, rooms) do
+    new_topics = MapSet.new(rooms, fn room -> "room:#{room.id}" end)
+    old_topics = Map.get(socket.assigns, :presence_topics, MapSet.new())
+
+    new_topics
+    |> MapSet.difference(old_topics)
+    |> Enum.each(fn topic -> Phoenix.PubSub.subscribe(QaApp.PubSub, topic) end)
+
+    old_topics
+    |> MapSet.difference(new_topics)
+    |> Enum.each(fn topic -> Phoenix.PubSub.unsubscribe(QaApp.PubSub, topic) end)
+
+    assign(socket, :presence_topics, new_topics)
   end
 end

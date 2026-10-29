@@ -112,6 +112,92 @@ defmodule QaAppWeb.AdminLiveIndexTest do
     end
   end
 
+  describe "max visitors" do
+    test "create room modal includes a max visitors field with unlimited support", %{conn: conn} do
+      view = open_admin(conn)
+      view |> element(~s(button[phx-click="open_create_room"])) |> render_click()
+
+      assert has_element?(view, ~s(#create-room-form [name="room[max_visitors]"]))
+    end
+
+    test "configure room modal allows editing the max visitors", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "config-max",
+          "title" => "Config Max",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+      view |> element(~s(button[phx-click="open_configure_room"])) |> render_click()
+
+      assert has_element?(view, ~s(#configure-room-form [name="room[max_visitors]"]))
+      assert is_nil(room.max_visitors) || room.max_visitors == 250
+    end
+
+    test "updating a room's max visitors persists the new limit", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "update-max",
+          "title" => "Update Max",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+      view |> element(~s(button[phx-click="open_configure_room"])) |> render_click()
+
+      view
+      |> form("#configure-room-form",
+        room: %{
+          "title" => "Update Max",
+          "slug" => "update-max",
+          "char_limit" => "320",
+          "max_visitors" => "75"
+        }
+      )
+      |> render_submit()
+
+      assert render(view) =~ "Room configured successfully."
+      assert Events.get_room!(room.id).max_visitors == 75
+    end
+  end
+
+  describe "live visitor counts" do
+    test "shows the total live visitors and per-room counts", %{conn: conn} do
+      {:ok, audience_room} =
+        Events.create_room(%{
+          "slug" => "living-room",
+          "title" => "Living Room",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      # A real audience visitor connects first so the admin page has data.
+      {:ok, _audience_view, _html} =
+        conn
+        |> Plug.Test.init_test_session(%{"session_id" => "admin-audience"})
+        |> live("/r/#{audience_room.slug}")
+
+      view = open_admin(conn)
+
+      assert has_element?(view, "#total-live-visitors")
+      assert render(view) =~ "1 live"
+
+      count_html = view |> element("#room-live-#{audience_room.id}") |> render()
+      assert count_html =~ "1"
+      assert count_html =~ "250"
+    end
+
+    test "shows zero live visitors when no one is connected", %{conn: conn} do
+      view = open_admin(conn)
+
+      assert has_element?(view, "#total-live-visitors")
+      assert render(view) =~ "0 live"
+    end
+  end
+
   describe "room expiry cleanup" do
     test "removes an expired room from the rooms table without a reload", %{conn: conn} do
       {:ok, room} =

@@ -2,6 +2,7 @@ defmodule QaAppWeb.ModeratorLive.Show do
   use QaAppWeb, :live_view
 
   alias QaApp.Engagement
+  alias QaApp.RoomCapacity
   alias QaAppWeb.ModeratorLive.RoomAuth
 
   def mount(params, _session, socket) do
@@ -9,6 +10,7 @@ defmodule QaAppWeb.ModeratorLive.Show do
       {:ok, socket} ->
         {:ok,
          socket
+         |> assign(:visitor_count, RoomCapacity.count(socket.assigns.room.id))
          |> assign(:show_qr_modal?, false)
          |> assign(:tab, :raised)
          |> load_questions()}
@@ -46,6 +48,16 @@ defmodule QaAppWeb.ModeratorLive.Show do
     {:noreply, assign(socket, :room, room)}
   end
 
+  # Visitor presence changed (join/leave); refresh the live count.
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    {:noreply, assign(socket, :visitor_count, RoomCapacity.count(socket.assigns.room.id))}
+  end
+
+  # Moderators are not visitors, so expulsions do not apply to this view.
+  def handle_info({:room_visitors_expelled, _session_ids}, socket) do
+    {:noreply, socket}
+  end
+
   def render(assigns) do
     ~H"""
     <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
@@ -65,6 +77,18 @@ defmodule QaAppWeb.ModeratorLive.Show do
             </div>
 
             <div class="flex items-center gap-3">
+              <span
+                id="moderator-visitor-count"
+                class="hidden sm:inline-flex items-center gap-1.5 h-10 px-3 rounded border border-line-strong bg-transparent font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+                {@visitor_count}
+                <span class="normal-case">live</span>
+                <%= if @room.max_visitors do %>
+                  <span class="text-ink-3">/ {@room.max_visitors}</span>
+                <% end %>
+              </span>
+
               <button
                 phx-click="toggle_qr_modal"
                 class="inline-flex items-center gap-2 h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"

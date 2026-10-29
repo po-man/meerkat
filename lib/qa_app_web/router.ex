@@ -23,6 +23,10 @@ defmodule QaAppWeb.Router do
 
     get "/", PageController, :home
 
+    # Static "room is full" page. Deliberately not a LiveView: waiting visitors
+    # must not hold a WebSocket, which is what the visitor limit protects.
+    get "/r/:slug/full", RoomFullController, :show
+
     # Combined sign-in / first-time setup page.
     # The path is intentionally secret (not linked from any public page),
     # see QaAppWeb.AdminAuth.

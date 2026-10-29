@@ -6,6 +6,7 @@ defmodule QaApp.Events do
   import Ecto.Query, warn: false
   alias QaApp.Repo
   alias QaApp.Events.Room
+  alias QaApp.RoomCapacity
   alias QaApp.RoomExpiryScheduler
 
   @default_expiry_in "7 days"
@@ -62,6 +63,9 @@ defmodule QaApp.Events do
     |> case do
       {:ok, updated_room} ->
         broadcast_room_updated(updated_room)
+        # If the limit was reduced below the current visitor count, expel the
+        # newest visitors until the room is back at or under capacity.
+        RoomCapacity.enforce_capacity(updated_room)
         {:ok, updated_room}
 
       error ->

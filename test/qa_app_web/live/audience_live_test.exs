@@ -33,6 +33,60 @@ defmodule QaAppWeb.AudienceLiveTest do
     assert html =~ ~s(phx-hook="LocalDateTime")
   end
 
+  describe "live visitors" do
+    test "shows the live visitor count in the masthead", %{conn: conn, room: room} do
+      conn = Plug.Test.init_test_session(conn, %{"session_id" => "audience-count"})
+      {:ok, view, _html} = live(conn, "/r/#{room.slug}")
+
+      assert has_element?(view, "#visitor-count")
+
+      html = view |> element("#visitor-count") |> render()
+      assert html =~ "1"
+      assert html =~ "attending"
+    end
+
+    test "redirects new visitors to the full page when the room is at capacity", %{
+      conn: conn,
+      room: room
+    } do
+      room
+      |> Ecto.Changeset.change(max_visitors: 1)
+      |> QaApp.Repo.update!()
+
+      {:ok, _view, _html} =
+        conn
+        |> Plug.Test.init_test_session(%{"session_id" => "audience-a"})
+        |> live("/r/#{room.slug}")
+
+      conn =
+        Plug.Test.init_test_session(Phoenix.ConnTest.build_conn(), %{
+          "session_id" => "audience-b"
+        })
+
+      full_path = "/r/#{room.slug}/full"
+
+      assert {:error, {:redirect, %{to: ^full_path}}} = live(conn, "/r/#{room.slug}")
+    end
+
+    test "redirects a visitor to the full page when they are expelled", %{
+      conn: conn,
+      room: room
+    } do
+      {:ok, view, _html} =
+        conn
+        |> Plug.Test.init_test_session(%{"session_id" => "session-me"})
+        |> live("/r/#{room.slug}")
+
+      Phoenix.PubSub.broadcast(
+        QaApp.PubSub,
+        "room:#{room.id}",
+        {:room_visitors_expelled, ["session-me"]}
+      )
+
+      assert_redirect(view, "/r/#{room.slug}/full")
+    end
+  end
+
   describe "current user's submitted question" do
     defp open_as(conn, slug, session_id) do
       conn = Plug.Test.init_test_session(conn, %{"session_id" => session_id})
