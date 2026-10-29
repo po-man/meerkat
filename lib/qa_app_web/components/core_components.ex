@@ -404,7 +404,7 @@ defmodule QaAppWeb.CoreComponents do
           <p :if={@label} class="text-sm font-medium text-ink">{@label}</p>
           <p :if={@hint} class="mt-1 text-xs leading-relaxed text-ink-3">{@hint}</p>
         </div>
-        <div class="relative h-5 w-9 shrink-0">
+        <label class="relative h-5 w-9 shrink-0 cursor-pointer">
           <input
             type="hidden"
             name={@name}
@@ -425,7 +425,7 @@ defmodule QaAppWeb.CoreComponents do
           <div class="absolute inset-0 rounded-full border border-line-strong bg-surface transition-colors duration-150 peer-checked:border-accent peer-checked:bg-accent">
           </div>
           <span class="absolute top-1/2 left-0.5 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-paper border border-line-strong transition-transform duration-150 peer-checked:translate-x-[16px] peer-checked:border-transparent"></span>
-        </div>
+        </label>
       </div>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
