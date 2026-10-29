@@ -94,6 +94,47 @@ defmodule QaAppWeb.ModeratorLiveSettingsTest do
       assert html =~ "must be greater than 0"
     end
 
+    test "updates the max visitors limit on submit", %{conn: conn, owner: owner, room: room} do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}/settings")
+
+      view
+      |> form("#settings-form",
+        room: %{
+          "title" => "New Title",
+          "max_visitors" => "120"
+        }
+      )
+      |> render_submit()
+
+      assert render(view) =~ "Room settings updated successfully."
+      assert Events.get_room!(room.id).max_visitors == 120
+    end
+
+    test "accepts an empty max visitors as unlimited", %{conn: conn, owner: owner, room: room} do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}/settings")
+
+      view
+      |> form("#settings-form", room: %{"title" => "New Title", "max_visitors" => ""})
+      |> render_submit()
+
+      assert render(view) =~ "Room settings updated successfully."
+      assert is_nil(Events.get_room!(room.id).max_visitors)
+    end
+
+    test "rejects a max visitors below 1", %{conn: conn, owner: owner, room: room} do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}/settings")
+
+      html =
+        view
+        |> form("#settings-form", room: %{"title" => "Valid Title", "max_visitors" => "0"})
+        |> render_submit()
+
+      assert html =~ "must be at least 1"
+    end
+
     test "redirects a moderator who does not own the room", %{conn: conn, room: room} do
       {:ok, other} =
         Accounts.create_moderator(%{"username" => "other-mod", "password" => "secret123"})

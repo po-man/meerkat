@@ -1,0 +1,30 @@
+<QaAppWeb.Layouts.app flash={@flash}>
+  <div class="max-w-5xl mx-auto px-6 pt-20 sm:pt-28 pb-24 text-center">
+    <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center justify-center gap-2.5">
+      <span class="w-2 h-2 rounded-full bg-danger motion-safe:animate-pulse"></span> Room Full
+    </p>
+
+    <h1 class="mt-6 text-4xl sm:text-5xl font-semibold tracking-[-0.035em] leading-[1.05] text-ink">
+      This room is at capacity
+    </h1>
+
+    <p class="mt-4 mx-auto max-w-md text-[15px] leading-relaxed text-ink-2">
+      <span class="font-medium text-ink">{@room.title}</span> has reached its
+      visitor limit. The page retries automatically, and you'll be brought in as
+      soon as a spot opens up.
+    </p>
+
+    <div class="mt-8 flex items-center justify-center gap-3">
+      <a
+        href={~p"/r/#{@room.slug}"}
+        class="inline-flex items-center gap-2 h-10 px-5 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
+      >
+        Try Again <.icon name="hero-arrow-path" class="size-3.5" />
+      </a>
+    </div>
+
+    <p class="mt-4 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+      No need to stay on this page — it auto-retries every few seconds
+    </p>
+  </div>
+</QaAppWeb.Layouts.app>

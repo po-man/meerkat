@@ -20,6 +20,8 @@ defmodule QaApp.Application do
          repos: Application.fetch_env!(:qa_app, :ecto_repos), skip: skip_migrations?()},
         {DNSCluster, query: Application.get_env(:qa_app, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: QaApp.PubSub},
+        # Tracks live visitors per room; used by capacity limits and counts.
+        QaApp.Presence,
         # Runs housekeeping on boot and keeps a timer for the soonest room expiry.
         room_expiry_scheduler,
         # Start to serve requests, typically the last entry

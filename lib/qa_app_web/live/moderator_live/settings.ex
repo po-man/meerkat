@@ -115,6 +115,20 @@ defmodule QaAppWeb.ModeratorLive.Settings do
               />
             </div>
 
+            <div>
+              <.input
+                field={@settings_form[:max_visitors]}
+                type="number"
+                min="1"
+                placeholder="250"
+                label="Max Concurrent Visitors"
+              />
+              <p class="mt-1 text-xs leading-relaxed text-ink-3">
+                Leave empty for unlimited. The room stops admitting new visitors
+                once this many people are connected.
+              </p>
+            </div>
+
             <button
               type="submit"
               class="w-full inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
