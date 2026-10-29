@@ -111,6 +111,25 @@ defmodule QaAppWeb.ModeratorLiveTest do
       refute Events.get_room!(room.id).is_active
     end
 
+    test "room dashboard live updates the status switch when the room changes elsewhere", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/dashboard")
+
+      assert view |> element("#room-active-toggle-#{room.id}") |> render() =~
+               ~s(aria-checked="true")
+
+      # An admin flips the status while the moderator dashboard is open.
+      {:ok, _} = Events.update_room(room, %{"is_active" => "false"})
+
+      assert_eventually(fn ->
+        view |> element("#room-active-toggle-#{room.id}") |> render() =~ ~s(aria-checked="false")
+      end)
+    end
+
     test "moderator page shows the question queue", %{conn: conn, owner: owner, room: room} do
       conn = login_as(conn, owner.username)
 
@@ -319,6 +338,19 @@ defmodule QaAppWeb.ModeratorLiveTest do
       assert html =~ "0"
       assert html =~ "live"
       assert html =~ "200"
+    end
+  end
+
+  defp assert_eventually(fun, timeout \\ 2_000) do
+    if fun.() do
+      :ok
+    else
+      if timeout <= 0 do
+        flunk("condition not met within the expected timeout")
+      else
+        Process.sleep(20)
+        assert_eventually(fun, timeout - 20)
+      end
     end
   end
 end

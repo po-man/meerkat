@@ -15,6 +15,12 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
     {:noreply, stream_rooms(socket)}
   end
 
+  # A room's settings changed from another view (admin control center or the
+  # room settings tab). Refresh the rows so the status toggle stays live.
+  def handle_info({:rooms_settings_updated, _room}, socket) do
+    {:noreply, stream_rooms(socket)}
+  end
+
   def handle_event("toggle_room_active", %{"id" => id}, socket) do
     room = Events.get_room!(id)
     {:ok, _} = Events.update_room(room, %{"is_active" => !room.is_active})

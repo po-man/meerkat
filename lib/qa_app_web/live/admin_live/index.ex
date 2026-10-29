@@ -53,6 +53,13 @@ defmodule QaAppWeb.AdminLive.Index do
   def handle_info({:room_settings_updated, _room}, socket), do: {:noreply, socket}
   def handle_info({:room_visitors_expelled, _session_ids}, socket), do: {:noreply, socket}
 
+  # A room's settings changed from another view (moderator dashboard, settings
+  # tab, or a status toggle). Refresh the streamed rows so the status toggle
+  # and labels stay live.
+  def handle_info({:rooms_settings_updated, _room}, socket) do
+    {:noreply, stream_rooms(socket)}
+  end
+
   def handle_event("open_create_room", _, socket) do
     {:noreply, assign(socket, :show_create_room_modal?, true)}
   end

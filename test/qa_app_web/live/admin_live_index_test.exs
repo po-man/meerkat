@@ -313,6 +313,28 @@ defmodule QaAppWeb.AdminLiveIndexTest do
       assert render(view) =~ "Room configured successfully."
       assert Events.get_room!(room.id).is_active == false
     end
+
+    test "live updates the status toggle when the room changes elsewhere", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "live-toggle-room",
+          "title" => "Live Toggle Room",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+
+      assert view |> element("#room-active-toggle-#{room.id}") |> render() =~
+               ~s(aria-checked="true")
+
+      # A moderator flips the status while the admin page is already open.
+      {:ok, _} = Events.update_room(room, %{"is_active" => "false"})
+
+      assert_eventually(fn ->
+        view |> element("#room-active-toggle-#{room.id}") |> render() =~ ~s(aria-checked="false")
+      end)
+    end
   end
 
   defp assert_eventually(fun, timeout \\ 2_000) do
