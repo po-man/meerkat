@@ -275,74 +275,74 @@ defmodule QaAppWeb.AdminLive.Index do
               </h3>
             </div>
 
-              <.form
-                for={@edit_room_form}
-                id="configure-room-form"
-                phx-submit="update_room"
-                class="space-y-4"
-              >
-                <.input field={@edit_room_form[:title]} type="text" required label="Room Title" />
+            <.form
+              for={@edit_room_form}
+              id="configure-room-form"
+              phx-submit="update_room"
+              class="space-y-4"
+            >
+              <.input field={@edit_room_form[:title]} type="text" required label="Room Title" />
 
-                <.input
-                  field={@edit_room_form[:slug]}
-                  type="text"
-                  required
-                  label="Room Slug (URL identifier)"
-                />
+              <.input
+                field={@edit_room_form[:slug]}
+                type="text"
+                required
+                label="Room Slug (URL identifier)"
+              />
 
-                <div>
-                  <label
-                    for="configure-room-moderator"
-                    class="block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 mb-2"
-                  >
-                    Assigned Moderator
-                  </label>
-                  <select
-                    id="configure-room-moderator"
-                    name="room[moderator_id]"
-                    class="w-full h-10 px-3 rounded bg-transparent border border-line-strong text-sm text-ink focus:outline-none focus:border-ink transition-colors"
-                  >
-                    <option value="">Select Moderator (Unassigned)...</option>
-                    <%= for moderator <- @moderators do %>
-                      <option
-                        value={moderator.id}
-                        selected={@edit_room_form[:moderator_id].value == moderator.id}
-                      >
-                        {moderator.username}
-                      </option>
-                    <% end %>
-                  </select>
-                </div>
+              <div>
+                <label
+                  for="configure-room-moderator"
+                  class="block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 mb-2"
+                >
+                  Assigned Moderator
+                </label>
+                <select
+                  id="configure-room-moderator"
+                  name="room[moderator_id]"
+                  class="w-full h-10 px-3 rounded bg-transparent border border-line-strong text-sm text-ink focus:outline-none focus:border-ink transition-colors"
+                >
+                  <option value="">Select Moderator (Unassigned)...</option>
+                  <%= for moderator <- @moderators do %>
+                    <option
+                      value={moderator.id}
+                      selected={@edit_room_form[:moderator_id].value == moderator.id}
+                    >
+                      {moderator.username}
+                    </option>
+                  <% end %>
+                </select>
+              </div>
 
-                <.input
-                  field={@edit_room_form[:char_limit]}
-                  type="number"
-                  required
-                  label="Max Character Limit"
-                />
+              <.input
+                field={@edit_room_form[:char_limit]}
+                type="number"
+                required
+                label="Max Character Limit"
+              />
 
-                <.input
-                  field={@edit_room_form[:intro_text]}
-                  type="textarea"
-                  label="Intro / Description Text"
-                />
+              <.input
+                field={@edit_room_form[:intro_text]}
+                type="textarea"
+                label="Intro / Description Text"
+              />
 
-                <div class="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    phx-click="close_configure_room"
-                    class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    class="inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </.form>
+              <div class="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  phx-click="close_configure_room"
+                  class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  class="inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </.form>
           </.modal>
         <% end %>
 
@@ -358,73 +358,73 @@ defmodule QaAppWeb.AdminLive.Index do
               </h3>
             </div>
 
-              <.form for={@room_form} id="create-room-form" phx-submit="create_room" class="space-y-4">
-                <.input
-                  field={@room_form[:slug]}
-                  type="text"
-                  placeholder="q4-townhall"
-                  required
-                  label="Room Slug (URL identifier)"
-                />
+            <.form for={@room_form} id="create-room-form" phx-submit="create_room" class="space-y-4">
+              <.input
+                field={@room_form[:slug]}
+                type="text"
+                placeholder="q4-townhall"
+                required
+                label="Room Slug (URL identifier)"
+              />
 
-                <.input
-                  field={@room_form[:title]}
-                  type="text"
-                  placeholder="All-Hands Q&A"
-                  required
-                  label="Event Title"
-                />
+              <.input
+                field={@room_form[:title]}
+                type="text"
+                placeholder="All-Hands Q&A"
+                required
+                label="Event Title"
+              />
 
-                <div>
-                  <label
-                    for="create-room-moderator"
-                    class="block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 mb-2"
-                  >
-                    Assign Moderator
-                  </label>
-                  <select
-                    id="create-room-moderator"
-                    name="room[moderator_id]"
-                    class="w-full h-10 px-3 rounded bg-transparent border border-line-strong text-sm text-ink focus:outline-none focus:border-ink transition-colors"
-                  >
-                    <option value="">Select Moderator...</option>
-                    <%= for moderator <- @moderators do %>
-                      <option value={moderator.id}>{moderator.username}</option>
-                    <% end %>
-                  </select>
-                </div>
+              <div>
+                <label
+                  for="create-room-moderator"
+                  class="block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 mb-2"
+                >
+                  Assign Moderator
+                </label>
+                <select
+                  id="create-room-moderator"
+                  name="room[moderator_id]"
+                  class="w-full h-10 px-3 rounded bg-transparent border border-line-strong text-sm text-ink focus:outline-none focus:border-ink transition-colors"
+                >
+                  <option value="">Select Moderator...</option>
+                  <%= for moderator <- @moderators do %>
+                    <option value={moderator.id}>{moderator.username}</option>
+                  <% end %>
+                </select>
+              </div>
 
-                <.input
-                  field={@room_form[:char_limit]}
-                  type="number"
-                  value="320"
-                  label="Max Character Limit"
-                />
+              <.input
+                field={@room_form[:char_limit]}
+                type="number"
+                value="320"
+                label="Max Character Limit"
+              />
 
-                <.input
-                  field={@room_form[:expires_in]}
-                  type="select"
-                  value="7 days"
-                  options={Room.expiry_options()}
-                  label="Room Expiry (auto-cleanup)"
-                />
+              <.input
+                field={@room_form[:expires_in]}
+                type="select"
+                value="7 days"
+                options={Room.expiry_options()}
+                label="Room Expiry (auto-cleanup)"
+              />
 
-                <div class="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    phx-click="close_create_room"
-                    class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    class="inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
-                  >
-                    Create Room
-                  </button>
-                </div>
-              </.form>
+              <div class="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  phx-click="close_create_room"
+                  class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  class="inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
+                >
+                  Create Room
+                </button>
+              </div>
+            </.form>
           </.modal>
         <% end %>
 
@@ -440,42 +440,42 @@ defmodule QaAppWeb.AdminLive.Index do
               </h3>
             </div>
 
-              <.form
-                for={@moderator_form}
-                id="create-moderator-form"
-                phx-submit="create_moderator"
-                class="space-y-4"
-              >
-                <.input
-                  field={@moderator_form[:username]}
-                  type="text"
-                  required
-                  label="Username"
-                />
+            <.form
+              for={@moderator_form}
+              id="create-moderator-form"
+              phx-submit="create_moderator"
+              class="space-y-4"
+            >
+              <.input
+                field={@moderator_form[:username]}
+                type="text"
+                required
+                label="Username"
+              />
 
-                <.input
-                  field={@moderator_form[:password]}
-                  type="password"
-                  required
-                  label="Initial Password"
-                />
+              <.input
+                field={@moderator_form[:password]}
+                type="password"
+                required
+                label="Initial Password"
+              />
 
-                <div class="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    phx-click="close_create_moderator"
-                    class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    class="inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
-                  >
-                    Create Account
-                  </button>
-                </div>
-              </.form>
+              <div class="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  phx-click="close_create_moderator"
+                  class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  class="inline-flex items-center justify-center h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150"
+                >
+                  Create Account
+                </button>
+              </div>
+            </.form>
           </.modal>
         <% end %>
       </div>

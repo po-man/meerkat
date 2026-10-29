@@ -33,12 +33,10 @@ defmodule QaAppWeb.Components.QuestionFeed do
       </div>
 
       <div class="col-span-10 sm:col-span-8 flex items-start gap-4">
-        <span
-          class={[
-            "shrink-0 w-11 py-2 rounded border flex flex-col items-center justify-center gap-0.5 font-mono text-xs tabular-nums",
-            if(@asked?, do: "border-line text-ink-3", else: "border-line-strong text-ink")
-          ]}
-        >
+        <span class={[
+          "shrink-0 w-11 py-2 rounded border flex flex-col items-center justify-center gap-0.5 font-mono text-xs tabular-nums",
+          if(@asked?, do: "border-line text-ink-3", else: "border-line-strong text-ink")
+        ]}>
           <.icon name="hero-chevron-up" class="size-3.5" />
           {@question.vote_count}
         </span>
