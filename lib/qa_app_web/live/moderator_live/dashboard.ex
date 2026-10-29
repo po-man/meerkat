@@ -18,8 +18,7 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
   end
 
   defp rooms_for(current_user) do
-    Events.list_rooms()
-    |> Enum.filter(fn r -> r.moderator_id == current_user.id end)
+    Events.list_rooms_for_moderator(current_user.id)
   end
 
   def render(assigns) do

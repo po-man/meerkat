@@ -17,6 +17,14 @@ defmodule QaApp.Events do
     |> Repo.preload(:moderator)
   end
 
+  def list_rooms_for_moderator(moderator_id) when not is_nil(moderator_id) do
+    Room
+    |> where([r], r.moderator_id == ^moderator_id)
+    |> order_by([r], desc: r.inserted_at)
+    |> Repo.all()
+    |> Repo.preload(:moderator)
+  end
+
   def get_room!(id) do
     Room
     |> Repo.get!(id)

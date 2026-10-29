@@ -26,7 +26,8 @@ defmodule QaAppWeb.AudienceLive.Show do
           if user_question do
             nil
           else
-            to_form(%{"content" => ""})
+            Engagement.change_question(room, session_id, %{"content" => ""})
+            |> to_form()
           end
 
         {:ok,
@@ -47,8 +48,8 @@ defmodule QaAppWeb.AudienceLive.Show do
     char_count = String.length(content)
 
     changeset =
-      %QaApp.Engagement.Question{room_id: room.id, session_id: socket.assigns.session_id}
-      |> QaApp.Engagement.Question.changeset(%{"content" => content}, room.char_limit)
+      socket.assigns.session_id
+      |> then(&Engagement.change_question(room, &1, %{"content" => content}))
       |> Map.put(:action, :validate)
 
     {:noreply,

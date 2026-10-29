@@ -35,6 +35,11 @@ defmodule QaApp.Engagement do
     |> Repo.get_by(room_id: room_id, session_id: session_id)
   end
 
+  def change_question(%Room{} = room, session_id, attrs \\ %{}) do
+    %Question{room_id: room.id, session_id: session_id}
+    |> Question.changeset(attrs, room.char_limit)
+  end
+
   def create_question(%Room{} = room, session_id, attrs) do
     attrs =
       attrs

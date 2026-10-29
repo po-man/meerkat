@@ -8,7 +8,7 @@ defmodule QaAppWeb.AdminLive.Index do
   def mount(_params, _session, socket) do
     rooms = Events.list_rooms()
     users = Accounts.list_users()
-    moderators = Enum.filter(users, fn u -> u.role == :moderator end)
+    moderators = Accounts.list_moderators()
 
     if connected?(socket) do
       Events.subscribe_rooms()
@@ -123,7 +123,7 @@ defmodule QaAppWeb.AdminLive.Index do
     case Accounts.create_moderator(%{"username" => username, "password" => password}) do
       {:ok, _moderator} ->
         users = Accounts.list_users()
-        moderators = Enum.filter(users, fn u -> u.role == :moderator end)
+        moderators = Accounts.list_moderators()
 
         {:noreply,
          socket

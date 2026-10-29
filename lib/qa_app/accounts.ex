@@ -11,6 +11,10 @@ defmodule QaApp.Accounts do
     Repo.all(User)
   end
 
+  def list_moderators do
+    Repo.all(from u in User, where: u.role == :moderator, order_by: [asc: u.username])
+  end
+
   def get_user!(id), do: Repo.get!(User, id)
 
   def get_user(id) when not is_nil(id), do: Repo.get(User, id)
