@@ -52,7 +52,7 @@ defmodule QaAppWeb.Router do
   # Moderator LiveView Routes
   live_session :moderator, on_mount: [{QaAppWeb.UserAuth, :require_authenticated_user}] do
     scope "/moderator", QaAppWeb do
-      pipe_through :browser
+      pipe_through [:browser, :require_authenticated_user]
 
       live "/dashboard", ModeratorLive.Dashboard, :index
       live "/r/:slug/settings", ModeratorLive.Settings, :settings

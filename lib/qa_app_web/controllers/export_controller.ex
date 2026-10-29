@@ -12,29 +12,31 @@ defmodule QaAppWeb.ExportController do
         |> redirect(to: "/")
 
       room ->
-        questions = Engagement.list_all_questions(room.id)
+        if authorized?(conn, room) do
+          questions = Engagement.list_all_questions(room.id)
 
-        header = "ID,Submitted At,Content,Vote Count,Is Asked,Session ID\n"
+          rows =
+            Enum.map(questions, fn q ->
+              submitted_at = Calendar.strftime(q.inserted_at, "%Y-%m-%d %H:%M:%S UTC")
+              escaped_content = "\"" <> String.replace(q.content, "\"", "\"\"") <> "\""
 
-        rows =
-          questions
-          |> Enum.map(fn q ->
-            submitted_at = Calendar.strftime(q.inserted_at, "%Y-%m-%d %H:%M:%S UTC")
-            escaped_content = "\"" <> String.replace(q.content, "\"", "\"\"") <> "\""
+              "#{submitted_at},#{escaped_content},#{q.vote_count},#{q.is_asked}\n"
+            end)
 
-            "#{q.id},#{submitted_at},#{escaped_content},#{q.vote_count},#{q.is_asked},#{q.session_id}\n"
-          end)
-          |> Enum.join("")
+          csv_data = "Submitted At,Content,Vote Count,Is Asked\n" <> Enum.join(rows, "")
 
-        csv_data = header <> rows
-
-        conn
-        |> put_resp_content_type("text/csv")
-        |> put_resp_header(
-          "content-disposition",
-          "attachment; filename=\"#{room.slug}-questions.csv\""
-        )
-        |> send_resp(200, csv_data)
+          conn
+          |> put_resp_content_type("text/csv")
+          |> put_resp_header(
+            "content-disposition",
+            "attachment; filename=\"#{room.slug}-questions.csv\""
+          )
+          |> send_resp(200, csv_data)
+        else
+          conn
+          |> put_flash(:error, "You are not authorized to export this room.")
+          |> redirect(to: "/")
+        end
     end
   end
 
@@ -51,5 +53,10 @@ defmodule QaAppWeb.ExportController do
         conn
         |> send_resp(500, "Failed to generate QR code")
     end
+  end
+
+  defp authorized?(conn, room) do
+    user = conn.assigns[:current_user]
+    user && (user.role == :admin || user.id == room.moderator_id)
   end
 end
