@@ -85,7 +85,7 @@ defmodule QaAppWeb.AudienceLive.Show do
     session_id = socket.assigns.session_id
     room = socket.assigns.room
 
-    case Engagement.toggle_vote(question_id, session_id) do
+    case Engagement.toggle_vote(room.id, question_id, session_id) do
       {:ok, _res} ->
         user_voted_ids = Engagement.list_user_voted_question_ids(room.id, session_id)
         {:noreply, assign(socket, :user_voted_ids, user_voted_ids)}

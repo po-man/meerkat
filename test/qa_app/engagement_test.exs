@@ -52,4 +52,42 @@ defmodule QaApp.EngagementTest do
                Engagement.create_question(room, "session-1", %{"content" => content})
     end
   end
+
+  describe "room scoping" do
+    setup do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "scope-a",
+          "title" => "Scope A",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      {:ok, other_room} =
+        Events.create_room(%{
+          "slug" => "scope-b",
+          "title" => "Scope B",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      {:ok, question} = Engagement.create_question(room, "session-1", %{"content" => "Hi"})
+      {:ok, room: room, other_room: other_room, question: question}
+    end
+
+    test "rejects voting on a question from another room", %{
+      other_room: other_room,
+      question: question
+    } do
+      assert {:error, :invalid_room} = Engagement.toggle_vote(other_room.id, question.id, "voter")
+    end
+
+    test "rejects marking a question from another room as asked", %{
+      other_room: other_room,
+      question: question
+    } do
+      assert {:error, :question_not_found} =
+               Engagement.set_question_asked(other_room.id, question.id, true)
+    end
+  end
 end

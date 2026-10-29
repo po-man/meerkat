@@ -46,8 +46,8 @@ defmodule QaAppWeb.AudienceLiveTest do
       {:ok, question} =
         Engagement.create_question(room, "session-me", %{"content" => "My question"})
 
-      {:ok, _} = Engagement.toggle_vote(question.id, "voter-1")
-      {:ok, _} = Engagement.toggle_vote(question.id, "voter-2")
+      {:ok, _} = Engagement.toggle_vote(room.id, question.id, "voter-1")
+      {:ok, _} = Engagement.toggle_vote(room.id, question.id, "voter-2")
 
       {:ok, view, html} = open_as(conn, room.slug, "session-me")
 

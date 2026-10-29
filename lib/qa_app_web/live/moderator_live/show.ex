@@ -44,27 +44,11 @@ defmodule QaAppWeb.ModeratorLive.Show do
   end
 
   def handle_event("mark_asked", %{"id" => question_id}, socket) do
-    question = Engagement.get_question!(question_id)
-
-    case Engagement.mark_as_asked(question) do
-      {:ok, _updated_question} ->
-        {:noreply, socket}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to update question state.")}
-    end
+    set_asked(socket, question_id, true)
   end
 
   def handle_event("mark_unasked", %{"id" => question_id}, socket) do
-    question = Engagement.get_question!(question_id)
-
-    case Engagement.mark_as_unasked(question) do
-      {:ok, _updated_question} ->
-        {:noreply, socket}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to update question state.")}
-    end
+    set_asked(socket, question_id, false)
   end
 
   def handle_event("toggle_qr_modal", _, socket) do
@@ -333,6 +317,16 @@ defmodule QaAppWeb.ModeratorLive.Show do
       </div>
     </QaAppWeb.Layouts.app>
     """
+  end
+
+  defp set_asked(socket, question_id, is_asked) do
+    case Engagement.set_question_asked(socket.assigns.room.id, question_id, is_asked) do
+      {:ok, _updated_question} ->
+        {:noreply, socket}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Failed to update question state.")}
+    end
   end
 
   defp load_questions(socket) do

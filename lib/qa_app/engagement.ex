@@ -68,6 +68,18 @@ defmodule QaApp.Engagement do
     update_asked_state(question, false)
   end
 
+  @doc """
+  Marks a question in `room_id` as asked/unasked. Returns `{:error,
+  :question_not_found}` when the question does not belong to that room, so
+  moderators can never touch questions outside their own room.
+  """
+  def set_question_asked(room_id, question_id, is_asked) when is_boolean(is_asked) do
+    case Repo.get_by(Question, id: question_id, room_id: room_id) do
+      nil -> {:error, :question_not_found}
+      question -> update_asked_state(question, is_asked)
+    end
+  end
+
   defp update_asked_state(%Question{} = question, is_asked) do
     question
     |> Question.changeset(%{is_asked: is_asked})
@@ -82,40 +94,54 @@ defmodule QaApp.Engagement do
     end
   end
 
-  def toggle_vote(question_id, session_id) do
+  def toggle_vote(room_id, question_id, session_id) do
     question = Repo.get!(Question, question_id)
 
-    # Prevent voting on own question
-    if question.session_id == session_id do
-      {:error, :cannot_vote_own_question}
-    else
-      Repo.transaction(fn ->
-        case Repo.get_by(Vote, question_id: question_id, session_id: session_id) do
-          %Vote{} = existing_vote ->
-            Repo.delete!(existing_vote)
+    cond do
+      question.room_id != room_id ->
+        # Never allow voting on a question from another room.
+        {:error, :invalid_room}
 
-            updated_question =
-              question
-              |> Ecto.Changeset.change(vote_count: max(0, question.vote_count - 1))
-              |> Repo.update!()
+      question.session_id == session_id ->
+        {:error, :cannot_vote_own_question}
 
+      true ->
+        case Repo.transaction(fn ->
+               do_toggle_vote(question, question_id, session_id)
+             end) do
+          {:ok, {direction, updated_question}} ->
             broadcast_question_updated(updated_question)
-            {:unvoted, updated_question}
+            {:ok, {direction, updated_question}}
 
-          nil ->
-            %Vote{}
-            |> Vote.changeset(%{question_id: question_id, session_id: session_id})
-            |> Repo.insert!()
-
-            updated_question =
-              question
-              |> Ecto.Changeset.change(vote_count: question.vote_count + 1)
-              |> Repo.update!()
-
-            broadcast_question_updated(updated_question)
-            {:voted, updated_question}
+          {:error, reason} ->
+            {:error, reason}
         end
-      end)
+    end
+  end
+
+  defp do_toggle_vote(question, question_id, session_id) do
+    case Repo.get_by(Vote, question_id: question_id, session_id: session_id) do
+      %Vote{} = existing_vote ->
+        Repo.delete!(existing_vote)
+
+        updated_question =
+          question
+          |> Ecto.Changeset.change(vote_count: max(0, question.vote_count - 1))
+          |> Repo.update!()
+
+        {:unvoted, updated_question}
+
+      nil ->
+        %Vote{}
+        |> Vote.changeset(%{question_id: question_id, session_id: session_id})
+        |> Repo.insert!()
+
+        updated_question =
+          question
+          |> Ecto.Changeset.change(vote_count: question.vote_count + 1)
+          |> Repo.update!()
+
+        {:voted, updated_question}
     end
   end
 
