@@ -8,7 +8,12 @@ import Config
 config :qa_app, QaApp.Repo,
   database: Path.expand("../qa_app_test.db", __DIR__),
   pool_size: 5,
-  pool: Ecto.Adapters.SQL.Sandbox
+  pool: Ecto.Adapters.SQL.Sandbox,
+  pragmas: [
+    journal_mode: :wal,
+    synchronous: :normal,
+    busy_timeout: 5000
+  ]
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.

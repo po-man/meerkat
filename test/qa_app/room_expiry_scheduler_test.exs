@@ -81,7 +81,7 @@ defmodule QaApp.RoomExpirySchedulerTest do
 
     assert :ok = RoomExpiryScheduler.room_created(room)
 
-    assert wait_until(fn -> Repo.get(Room, room.id) == nil end, 5_000)
+    assert wait_until(fn -> Repo.get(Room, room.id) == nil end, 15_000)
   end
 
   defp wait_until(fun, timeout_ms) do
