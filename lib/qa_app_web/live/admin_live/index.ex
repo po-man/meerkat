@@ -26,9 +26,7 @@ defmodule QaAppWeb.AdminLive.Index do
      |> assign(:edit_room_form, nil)
      |> assign(:show_create_room_modal?, false)
      |> assign(:show_create_moderator_modal?, false)
-     |> assign(:show_configure_room_modal?, false)
-     |> assign(:moderator_username, "")
-     |> assign(:moderator_password, "")}
+     |> assign(:show_configure_room_modal?, false)}
   end
 
   def handle_info({:room_expired, _room_id}, socket) do

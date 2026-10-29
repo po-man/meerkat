@@ -12,10 +12,6 @@ defmodule QaApp.Engagement do
     list_questions_by_asked(room_id, false)
   end
 
-  def list_raised_questions(room_id) do
-    list_questions_by_asked(room_id, false)
-  end
-
   def list_asked_questions(room_id) do
     list_questions_by_asked(room_id, true)
   end
@@ -33,8 +29,6 @@ defmodule QaApp.Engagement do
     |> order_by([q], desc: q.vote_count, desc: q.inserted_at)
     |> Repo.all()
   end
-
-  def get_question!(id), do: Repo.get!(Question, id)
 
   def get_question_by_session(room_id, session_id) do
     Question

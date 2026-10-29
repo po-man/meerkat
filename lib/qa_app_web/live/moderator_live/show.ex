@@ -333,7 +333,7 @@ defmodule QaAppWeb.ModeratorLive.Show do
     room_id = socket.assigns.room.id
 
     assign(socket,
-      raised_questions: Engagement.list_raised_questions(room_id),
+      raised_questions: Engagement.list_active_questions(room_id),
       asked_questions: Engagement.list_asked_questions(room_id)
     )
   end
