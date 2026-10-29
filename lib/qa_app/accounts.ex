@@ -13,6 +13,8 @@ defmodule QaApp.Accounts do
 
   def get_user!(id), do: Repo.get!(User, id)
 
+  def get_user(id) when not is_nil(id), do: Repo.get(User, id)
+
   def get_user_by_username(username) when is_binary(username) do
     Repo.get_by(User, username: username)
   end

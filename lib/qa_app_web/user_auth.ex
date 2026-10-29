@@ -18,9 +18,23 @@ defmodule QaAppWeb.UserAuth do
   end
 
   def fetch_current_user(conn, _opts) do
-    user_id = get_session(conn, :user_id)
-    user = user_id && Accounts.get_user!(user_id)
-    assign(conn, :current_user, user)
+    case get_session(conn, :user_id) do
+      nil ->
+        assign(conn, :current_user, nil)
+
+      user_id ->
+        case Accounts.get_user(user_id) do
+          nil ->
+            # Stale session pointing at a deleted user: clear it instead of
+            # raising on every request.
+            conn
+            |> configure_session(drop: true)
+            |> assign(:current_user, nil)
+
+          user ->
+            assign(conn, :current_user, user)
+        end
+    end
   end
 
   def require_authenticated_user(conn, _opts) do
@@ -56,40 +70,36 @@ defmodule QaAppWeb.UserAuth do
   end
 
   def on_mount(:mount_current_user, _params, session, socket) do
-    case session["user_id"] do
-      nil ->
-        {:cont, Phoenix.Component.assign(socket, :current_user, nil)}
-
-      user_id ->
-        user = Accounts.get_user!(user_id)
-        {:cont, Phoenix.Component.assign(socket, :current_user, user)}
-    end
+    {:cont, Phoenix.Component.assign(socket, :current_user, user_from_session(session))}
   end
 
   def on_mount(:require_authenticated_user, _params, session, socket) do
-    case session["user_id"] do
+    case user_from_session(session) do
       nil ->
         {:halt, Phoenix.LiveView.redirect(socket, to: AdminAuth.secret_path())}
 
-      user_id ->
-        user = Accounts.get_user!(user_id)
+      user ->
         {:cont, Phoenix.Component.assign(socket, :current_user, user)}
     end
   end
 
   def on_mount(:require_admin, _params, session, socket) do
-    case session["user_id"] do
+    case user_from_session(session) do
       nil ->
         {:halt, Phoenix.LiveView.redirect(socket, to: AdminAuth.secret_path())}
 
-      user_id ->
-        user = Accounts.get_user!(user_id)
+      %{role: :admin} = user ->
+        {:cont, Phoenix.Component.assign(socket, :current_user, user)}
 
-        if user.role == :admin do
-          {:cont, Phoenix.Component.assign(socket, :current_user, user)}
-        else
-          {:halt, Phoenix.LiveView.redirect(socket, to: AdminAuth.dashboard_path(user))}
-        end
+      user ->
+        {:halt, Phoenix.LiveView.redirect(socket, to: AdminAuth.dashboard_path(user))}
+    end
+  end
+
+  defp user_from_session(session) do
+    case session["user_id"] do
+      nil -> nil
+      user_id -> Accounts.get_user(user_id)
     end
   end
 end
