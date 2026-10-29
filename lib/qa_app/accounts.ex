@@ -35,7 +35,6 @@ defmodule QaApp.Accounts do
     attrs_with_defaults =
       attrs
       |> Map.put("role", :moderator)
-      |> Map.put_new("must_change_password", true)
 
     %User{}
     |> User.registration_changeset(attrs_with_defaults)

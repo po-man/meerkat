@@ -9,14 +9,13 @@ defmodule QaApp.Accounts.User do
     field :password, :string, virtual: true, redact: true
     field :hashed_password, :string, redact: true
     field :role, Ecto.Enum, values: [:admin, :moderator]
-    field :must_change_password, :boolean, default: false
 
     timestamps(type: :utc_datetime)
   end
 
   def changeset(user, attrs) do
     user
-    |> cast(attrs, [:username, :role, :must_change_password])
+    |> cast(attrs, [:username, :role])
     |> validate_required([:username, :role])
     |> validate_length(:username, min: 3, max: 50)
     |> unique_constraint(:username)
@@ -37,7 +36,6 @@ defmodule QaApp.Accounts.User do
     |> validate_required([:password])
     |> validate_length(:password, min: 6, max: 72)
     |> hash_password()
-    |> change(must_change_password: false)
   end
 
   defp hash_password(changeset) do
