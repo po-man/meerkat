@@ -196,6 +196,45 @@ defmodule QaAppWeb.AdminLiveIndexTest do
       assert has_element?(view, "#total-live-visitors")
       assert render(view) =~ "0 live"
     end
+
+    test "live updates the per-room column and total when a visitor joins", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "live-update-room",
+          "title" => "Live Update Room",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      # The admin page is already open (no visitors yet).
+      view = open_admin(conn)
+      assert view |> element("#room-live-#{room.id}") |> render() =~ "0"
+      assert render(view) =~ "0 live"
+
+      # A visitor joins after the admin page was opened.
+      {:ok, _audience_view, _html} =
+        conn
+        |> Plug.Test.init_test_session(%{"session_id" => "live-update-audience"})
+        |> live("/r/#{room.slug}")
+
+      # The presence diff must reach the open admin LiveView and update the
+      # streamed column live, without any reload from the admin side.
+      assert_eventually(fn -> view |> element("#room-live-#{room.id}") |> render() =~ "1" end)
+      assert_eventually(fn -> render(view) =~ "1 live" end)
+    end
+  end
+
+  defp assert_eventually(fun, timeout \\ 2_000) do
+    if fun.() do
+      :ok
+    else
+      if timeout <= 0 do
+        flunk("condition not met within the expected timeout")
+      else
+        Process.sleep(20)
+        assert_eventually(fun, timeout - 20)
+      end
+    end
   end
 
   describe "room expiry cleanup" do
