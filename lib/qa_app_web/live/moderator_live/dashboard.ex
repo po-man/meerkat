@@ -60,7 +60,11 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
             </p>
           </div>
 
-          <div :for={{id, {room, index}} <- @streams.rooms} id={id} class="group grid grid-cols-12 gap-x-4 sm:gap-x-6 items-center py-5 border-b border-line hover:bg-surface transition-colors">
+          <div
+            :for={{id, {room, index}} <- @streams.rooms}
+            id={id}
+            class="group grid grid-cols-12 gap-x-4 sm:gap-x-6 items-center py-5 border-b border-line hover:bg-surface transition-colors"
+          >
             <div class="col-span-1 hidden sm:block">
               <span class="font-mono text-xs text-ink-3 tabular-nums">{index}</span>
             </div>
