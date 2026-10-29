@@ -6,7 +6,6 @@ defmodule QaAppWeb.AdminLive.Index do
   alias QaApp.Accounts
 
   def mount(_params, _session, socket) do
-    rooms = Events.list_rooms()
     users = Accounts.list_users()
     moderators = Accounts.list_moderators()
 
@@ -18,7 +17,7 @@ defmodule QaAppWeb.AdminLive.Index do
 
     {:ok,
      socket
-     |> assign(:rooms, rooms)
+     |> stream_rooms()
      |> assign(:users, users)
      |> assign(:moderators, moderators)
      |> assign(:room_form, room_form)
@@ -31,7 +30,7 @@ defmodule QaAppWeb.AdminLive.Index do
   end
 
   def handle_info({:room_expired, _room_id}, socket) do
-    {:noreply, assign(socket, :rooms, Events.list_rooms())}
+    {:noreply, stream_rooms(socket)}
   end
 
   def handle_event("open_create_room", _, socket) do
@@ -77,11 +76,9 @@ defmodule QaAppWeb.AdminLive.Index do
 
     case Events.create_room(room_params) do
       {:ok, _room} ->
-        rooms = Events.list_rooms()
-
         {:noreply,
          socket
-         |> assign(:rooms, rooms)
+         |> stream_rooms()
          |> assign(:show_create_room_modal?, false)
          |> assign(:room_form, to_form(Events.change_room(%Room{})))
          |> put_flash(:info, "Room created successfully.")}
@@ -101,11 +98,9 @@ defmodule QaAppWeb.AdminLive.Index do
 
     case Events.update_room(room, room_params) do
       {:ok, _updated_room} ->
-        rooms = Events.list_rooms()
-
         {:noreply,
          socket
-         |> assign(:rooms, rooms)
+         |> stream_rooms()
          |> assign(:show_configure_room_modal?, false)
          |> assign(:editing_room, nil)
          |> assign(:edit_room_form, nil)
@@ -141,8 +136,7 @@ defmodule QaAppWeb.AdminLive.Index do
   def handle_event("delete_room", %{"id" => id}, socket) do
     room = Events.get_room!(id)
     {:ok, _} = Events.delete_room(room)
-    rooms = Events.list_rooms()
-    {:noreply, assign(socket, :rooms, rooms)}
+    {:noreply, stream_rooms(socket)}
   end
 
   def render(assigns) do
@@ -186,7 +180,7 @@ defmodule QaAppWeb.AdminLive.Index do
           <div class="flex items-baseline justify-between gap-4 pb-3 border-b border-line">
             <h3 class="text-lg font-semibold tracking-[-0.01em] text-ink">Event Rooms</h3>
             <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
-              {length(@rooms)} total
+              {@rooms_count} total
             </span>
           </div>
 
@@ -211,53 +205,55 @@ defmodule QaAppWeb.AdminLive.Index do
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                <%= for room <- @rooms do %>
-                  <tr class="border-b border-line hover:bg-surface transition-colors">
-                    <td class="py-4 pr-4 align-top">
-                      <div class="font-semibold text-ink">{room.title}</div>
-                      <div class="mt-0.5 font-mono text-xs text-ink-3">/r/{room.slug}</div>
-                    </td>
-                    <td class="py-4 pr-4 align-top">
-                      <%= if room.moderator do %>
-                        <span class="font-mono text-xs text-ink-2">{room.moderator.username}</span>
-                      <% else %>
-                        <span class="font-mono text-xs text-ink-3">Unassigned</span>
-                      <% end %>
-                    </td>
-                    <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
-                      {room.char_limit} characters
-                    </td>
-                    <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
-                      <.local_datetime id={"room-expiry-#{room.id}"} datetime={room.expires_at} />
-                    </td>
-                    <td class="py-4 align-top text-right whitespace-nowrap">
-                      <div class="inline-flex items-center gap-4">
-                        <button
-                          phx-click="open_configure_room"
-                          phx-value-id={room.id}
-                          class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors underline-offset-4 hover:underline"
-                        >
-                          Configure
-                        </button>
-                        <.link
-                          navigate={~p"/moderator/r/#{room.slug}"}
-                          class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors underline-offset-4 hover:underline"
-                        >
-                          Moderate
-                        </.link>
-                        <button
-                          phx-click="delete_room"
-                          phx-value-id={room.id}
-                          data-confirm="Are you sure you want to delete this room?"
-                          class="text-[13px] font-medium text-danger hover:underline underline-offset-4 transition-colors"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                <% end %>
+              <tbody id="rooms-rows" phx-update="stream">
+                <tr
+                  :for={{id, room} <- @streams.rooms}
+                  id={id}
+                  class="border-b border-line hover:bg-surface transition-colors"
+                >
+                  <td class="py-4 pr-4 align-top">
+                    <div class="font-semibold text-ink">{room.title}</div>
+                    <div class="mt-0.5 font-mono text-xs text-ink-3">/r/{room.slug}</div>
+                  </td>
+                  <td class="py-4 pr-4 align-top">
+                    <%= if room.moderator do %>
+                      <span class="font-mono text-xs text-ink-2">{room.moderator.username}</span>
+                    <% else %>
+                      <span class="font-mono text-xs text-ink-3">Unassigned</span>
+                    <% end %>
+                  </td>
+                  <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
+                    {room.char_limit} characters
+                  </td>
+                  <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
+                    <.local_datetime id={"room-expiry-#{room.id}"} datetime={room.expires_at} />
+                  </td>
+                  <td class="py-4 align-top text-right whitespace-nowrap">
+                    <div class="inline-flex items-center gap-4">
+                      <button
+                        phx-click="open_configure_room"
+                        phx-value-id={room.id}
+                        class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors underline-offset-4 hover:underline"
+                      >
+                        Configure
+                      </button>
+                      <.link
+                        navigate={~p"/moderator/r/#{room.slug}"}
+                        class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors underline-offset-4 hover:underline"
+                      >
+                        Moderate
+                      </.link>
+                      <button
+                        phx-click="delete_room"
+                        phx-value-id={room.id}
+                        data-confirm="Are you sure you want to delete this room?"
+                        class="text-[13px] font-medium text-danger hover:underline underline-offset-4 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -481,5 +477,13 @@ defmodule QaAppWeb.AdminLive.Index do
       </div>
     </QaAppWeb.Layouts.app>
     """
+  end
+
+  defp stream_rooms(socket) do
+    rooms = Events.list_rooms()
+
+    socket
+    |> assign(:rooms_count, length(rooms))
+    |> stream(:rooms, rooms, dom_id: &("room-" <> &1.id), reset: true)
   end
 end
