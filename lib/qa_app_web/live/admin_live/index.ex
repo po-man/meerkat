@@ -34,17 +34,17 @@ defmodule QaAppWeb.AdminLive.Index do
     {:noreply, stream_rooms(socket)}
   end
 
-  # A visitor joined or left a room; refresh that room's live count.
+  # A visitor joined or left a room; refresh the live visitor counts.
+  #
+  # The counts are rendered inside streamed table rows, and LiveView only
+  # morphs streamed children when the collection itself is re-streamed — an
+  # outer assign change alone does not update the rows in the browser. So we
+  # recompute the counts and re-stream the rooms together.
   def handle_info(
-        %Phoenix.Socket.Broadcast{event: "presence_diff", topic: "room:" <> room_id},
+        %Phoenix.Socket.Broadcast{event: "presence_diff", topic: "room:" <> _room_id},
         socket
       ) do
-    visitor_counts = Map.put(socket.assigns.visitor_counts, room_id, RoomCapacity.count(room_id))
-
-    {:noreply,
-     socket
-     |> assign(:visitor_counts, visitor_counts)
-     |> assign(:total_visitors, Enum.sum(Map.values(visitor_counts)))}
+    {:noreply, stream_rooms(socket)}
   end
 
   # The admin is subscribed to the room topics for presence diffs, so it also
