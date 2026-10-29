@@ -76,7 +76,10 @@ defmodule QaApp.RoomExpirySchedulerTest do
   test "cleans up a room when its arming timer fires without a restart" do
     start_supervised!(RoomExpiryScheduler)
 
-    expires_at = DateTime.add(DateTime.utc_now(), 1, :second) |> DateTime.truncate(:second)
+    # Comfortably in the future so the scheduler always arms, even if the
+    # `room_created` cast is slightly delayed (a +1s + truncate timestamp can
+    # land in the past before the scheduler processes it).
+    expires_at = DateTime.add(DateTime.utc_now(), 3, :second) |> DateTime.truncate(:second)
     room = insert_room!(%{slug: "timer-fire", expires_at: expires_at})
 
     assert :ok = RoomExpiryScheduler.room_created(room)
