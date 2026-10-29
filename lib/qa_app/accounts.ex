@@ -11,7 +11,13 @@ defmodule QaApp.Accounts do
     Repo.all(User)
   end
 
+  def list_moderators do
+    Repo.all(from u in User, where: u.role == :moderator, order_by: [asc: u.username])
+  end
+
   def get_user!(id), do: Repo.get!(User, id)
+
+  def get_user(id) when not is_nil(id), do: Repo.get(User, id)
 
   def get_user_by_username(username) when is_binary(username) do
     Repo.get_by(User, username: username)
@@ -33,7 +39,6 @@ defmodule QaApp.Accounts do
     attrs_with_defaults =
       attrs
       |> Map.put("role", :moderator)
-      |> Map.put_new("must_change_password", true)
 
     %User{}
     |> User.registration_changeset(attrs_with_defaults)

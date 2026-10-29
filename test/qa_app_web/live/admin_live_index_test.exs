@@ -125,6 +125,7 @@ defmodule QaAppWeb.AdminLiveIndexTest do
 
       view = open_admin(conn)
 
+      assert has_element?(view, "#rooms-rows[phx-update=stream]")
       assert render(view) =~ "Expires Soon"
 
       # Simulate the scheduler: move the expiry into the past and clean up.

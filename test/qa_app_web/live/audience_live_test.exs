@@ -39,6 +39,38 @@ defmodule QaAppWeb.AudienceLiveTest do
       live(conn, "/r/#{slug}")
     end
 
+    test "renders the question feed as a live stream", %{conn: conn, room: room} do
+      {:ok, view, _html} = open_as(conn, room.slug, "audience-0")
+
+      assert has_element?(view, "#questions-feed[phx-update=stream]")
+    end
+
+    test "redirects from an inactive room", %{conn: conn, room: room} do
+      room
+      |> Ecto.Changeset.change(is_active: false)
+      |> QaApp.Repo.update!()
+
+      conn = get(conn, ~p"/r/#{room.slug}")
+
+      assert redirected_to(conn) == "/"
+    end
+
+    test "an upvote toggles the button's selected state", %{conn: conn, room: room} do
+      {:ok, vote_question} =
+        Engagement.create_question(room, "voter-session", %{"content" => "Toggle me"})
+
+      {:ok, view, _html} = open_as(conn, room.slug, "current-session")
+
+      assert has_element?(view, ~s(#q-#{vote_question.id} button[phx-click="toggle_vote"]))
+      refute has_element?(view, ~s(#q-#{vote_question.id} button.bg-ink))
+
+      view
+      |> element(~s(#q-#{vote_question.id} button[phx-click="toggle_vote"]))
+      |> render_click()
+
+      assert has_element?(view, ~s(#q-#{vote_question.id} button.bg-ink))
+    end
+
     test "shows the Raised status and upvote count beside the submitted question", %{
       conn: conn,
       room: room
@@ -46,8 +78,8 @@ defmodule QaAppWeb.AudienceLiveTest do
       {:ok, question} =
         Engagement.create_question(room, "session-me", %{"content" => "My question"})
 
-      {:ok, _} = Engagement.toggle_vote(question.id, "voter-1")
-      {:ok, _} = Engagement.toggle_vote(question.id, "voter-2")
+      {:ok, _} = Engagement.toggle_vote(room.id, question.id, "voter-1")
+      {:ok, _} = Engagement.toggle_vote(room.id, question.id, "voter-2")
 
       {:ok, view, html} = open_as(conn, room.slug, "session-me")
 

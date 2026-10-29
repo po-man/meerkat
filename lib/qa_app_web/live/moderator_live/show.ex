@@ -1,37 +1,20 @@
 defmodule QaAppWeb.ModeratorLive.Show do
   use QaAppWeb, :live_view
 
-  alias QaApp.Events
   alias QaApp.Engagement
+  alias QaAppWeb.ModeratorLive.RoomAuth
 
-  def mount(%{"slug" => slug}, _session, socket) do
-    case Events.get_room_by_slug(slug) do
-      nil ->
+  def mount(params, _session, socket) do
+    case RoomAuth.authorize(socket, params) do
+      {:ok, socket} ->
         {:ok,
          socket
-         |> put_flash(:error, "Event room not found")
-         |> redirect(to: "/")}
+         |> assign(:show_qr_modal?, false)
+         |> assign(:tab, :raised)
+         |> load_questions()}
 
-      room ->
-        current_user = socket.assigns[:current_user]
-
-        if current_user && (current_user.role == :admin || current_user.id == room.moderator_id) do
-          if connected?(socket) do
-            Events.subscribe_room(room.id)
-          end
-
-          {:ok,
-           socket
-           |> assign(:room, room)
-           |> assign(:show_qr_modal?, false)
-           |> assign(:tab, :raised)
-           |> load_questions()}
-        else
-          {:ok,
-           socket
-           |> put_flash(:error, "Unauthorized access to this room dashboard.")
-           |> redirect(to: "/")}
-        end
+      {:redirect, socket} ->
+        {:ok, socket}
     end
   end
 
@@ -44,38 +27,18 @@ defmodule QaAppWeb.ModeratorLive.Show do
   end
 
   def handle_event("mark_asked", %{"id" => question_id}, socket) do
-    question = Engagement.get_question!(question_id)
-
-    case Engagement.mark_as_asked(question) do
-      {:ok, _updated_question} ->
-        {:noreply, socket}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to update question state.")}
-    end
+    set_asked(socket, question_id, true)
   end
 
   def handle_event("mark_unasked", %{"id" => question_id}, socket) do
-    question = Engagement.get_question!(question_id)
-
-    case Engagement.mark_as_unasked(question) do
-      {:ok, _updated_question} ->
-        {:noreply, socket}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to update question state.")}
-    end
+    set_asked(socket, question_id, false)
   end
 
   def handle_event("toggle_qr_modal", _, socket) do
     {:noreply, assign(socket, :show_qr_modal?, not socket.assigns.show_qr_modal?)}
   end
 
-  def handle_info({:question_created, _question}, socket) do
-    {:noreply, load_questions(socket)}
-  end
-
-  def handle_info({:question_updated, _question}, socket) do
+  def handle_info({tag, _question}, socket) when tag in [:question_created, :question_updated] do
     {:noreply, load_questions(socket)}
   end
 
@@ -136,7 +99,7 @@ defmodule QaAppWeb.ModeratorLive.Show do
                   "font-mono text-[11px] tabular-nums",
                   if(@tab == :raised, do: "text-paper/60", else: "text-ink-3/60")
                 ]}>
-                  {length(@raised_questions)}
+                  {@raised_count}
                 </span>
               </.link>
 
@@ -158,133 +121,53 @@ defmodule QaAppWeb.ModeratorLive.Show do
                   "font-mono text-[11px] tabular-nums",
                   if(@tab == :asked, do: "text-paper/60", else: "text-ink-3/60")
                 ]}>
-                  {length(@asked_questions)}
+                  {@asked_count}
                 </span>
               </.link>
             </div>
 
             <span class="w-full sm:w-auto font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
-              {if(@tab == :raised, do: length(@raised_questions), else: length(@asked_questions))} total · Sorted by votes
+              {if(@tab == :raised, do: @raised_count, else: @asked_count)} total · Sorted by votes
             </span>
           </div>
 
           <div id="moderator-questions-feed">
             <%= if @tab == :raised do %>
-              <div id="raised-questions-feed">
-                <%= if Enum.empty?(@raised_questions) do %>
-                  <div class="py-16 text-center">
-                    <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                      No raised questions yet
-                    </p>
-                    <p class="mt-2 text-[13px] text-ink-3">
-                      Questions submitted by the audience will appear here.
-                    </p>
-                  </div>
-                <% else %>
-                  <%= for {question, i} <- Enum.with_index(@raised_questions) do %>
-                    <div
-                      id={"moderator-q-#{question.id}"}
-                      class="grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-5 border-b border-line"
-                    >
-                      <div class="col-span-1 sm:col-span-1">
-                        <span class="font-mono text-xs text-ink-3 tabular-nums">{i + 1}</span>
-                      </div>
+              <div id="raised-questions-feed" phx-update="stream">
+                <div id="raised-empty" class="hidden only:block py-16 text-center">
+                  <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                    No raised questions yet
+                  </p>
+                  <p class="mt-2 text-[13px] text-ink-3">
+                    Questions submitted by the audience will appear here.
+                  </p>
+                </div>
 
-                      <div class="col-span-10 sm:col-span-8 flex items-start gap-4">
-                        <span class="shrink-0 w-11 py-2 rounded border border-line-strong text-ink flex flex-col items-center justify-center gap-0.5 font-mono text-xs tabular-nums">
-                          <.icon name="hero-chevron-up" class="size-3.5" />
-                          {question.vote_count}
-                        </span>
-
-                        <div class="flex-1 min-w-0 pt-1">
-                          <p class="text-[16px] leading-relaxed text-ink break-words">
-                            {question.content}
-                          </p>
-                          <div class="mt-2 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                            <span class="normal-case tracking-normal tabular-nums">
-                              Submitted
-                              <.local_datetime
-                                id={"submitted-at-#{question.id}"}
-                                datetime={question.inserted_at}
-                                format={:time}
-                              />
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div class="col-span-12 sm:col-span-3 flex justify-end pt-3 sm:pt-1">
-                        <button
-                          phx-click="mark_asked"
-                          phx-value-id={question.id}
-                          class="inline-flex items-center gap-1.5 h-8 px-3 rounded border border-line-strong bg-transparent text-ink-2 text-xs font-medium hover:border-ink hover:text-ink transition-colors duration-150"
-                        >
-                          <.icon name="hero-check" class="size-3.5" /> Mark as Asked
-                        </button>
-                      </div>
-                    </div>
-                  <% end %>
-                <% end %>
+                <.moderator_question
+                  :for={{id, {question, index}} <- @streams.raised_questions}
+                  id={id}
+                  question={question}
+                  index={index}
+                />
               </div>
             <% else %>
-              <div id="asked-questions-feed">
-                <%= if Enum.empty?(@asked_questions) do %>
-                  <div class="py-16 text-center">
-                    <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                      No asked questions yet
-                    </p>
-                    <p class="mt-2 text-[13px] text-ink-3">
-                      Questions you mark as asked will appear here.
-                    </p>
-                  </div>
-                <% else %>
-                  <%= for {question, i} <- Enum.with_index(@asked_questions) do %>
-                    <div
-                      id={"moderator-q-#{question.id}"}
-                      class="grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-5 border-b border-line"
-                    >
-                      <div class="col-span-2 sm:col-span-1">
-                        <span class="font-mono text-xs text-ink-3 tabular-nums">{i + 1}</span>
-                      </div>
+              <div id="asked-questions-feed" phx-update="stream">
+                <div id="asked-empty" class="hidden only:block py-16 text-center">
+                  <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                    No asked questions yet
+                  </p>
+                  <p class="mt-2 text-[13px] text-ink-3">
+                    Questions you mark as asked will appear here.
+                  </p>
+                </div>
 
-                      <div class="col-span-10 sm:col-span-8 flex items-start gap-4">
-                        <span class="shrink-0 w-11 py-2 rounded border border-line text-ink-3 flex flex-col items-center justify-center gap-0.5 font-mono text-xs tabular-nums">
-                          <.icon name="hero-chevron-up" class="size-3.5" />
-                          {question.vote_count}
-                        </span>
-
-                        <div class="flex-1 min-w-0 pt-1">
-                          <p class="text-[16px] leading-relaxed text-ink break-words">
-                            {question.content}
-                          </p>
-                          <div class="mt-2 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                            <span class="normal-case tracking-normal tabular-nums">
-                              Submitted
-                              <.local_datetime
-                                id={"submitted-at-#{question.id}"}
-                                datetime={question.inserted_at}
-                                format={:time}
-                              />
-                            </span>
-                            <span class="text-ink-2 flex items-center gap-1.5">
-                              <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Asked
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div class="col-span-12 sm:col-span-3 flex justify-end pt-3 sm:pt-1">
-                        <button
-                          phx-click="mark_unasked"
-                          phx-value-id={question.id}
-                          class="inline-flex items-center gap-1.5 h-8 px-3 rounded border border-line-strong bg-transparent text-ink-2 text-xs font-medium hover:border-ink hover:text-ink transition-colors duration-150"
-                        >
-                          <.icon name="hero-arrow-uturn-left" class="size-3.5" /> Move back
-                        </button>
-                      </div>
-                    </div>
-                  <% end %>
-                <% end %>
+                <.moderator_question
+                  :for={{id, {question, index}} <- @streams.asked_questions}
+                  id={id}
+                  question={question}
+                  index={index}
+                  asked?
+                />
               </div>
             <% end %>
           </div>
@@ -335,12 +218,31 @@ defmodule QaAppWeb.ModeratorLive.Show do
     """
   end
 
+  defp set_asked(socket, question_id, is_asked) do
+    case Engagement.set_question_asked(socket.assigns.room.id, question_id, is_asked) do
+      {:ok, _updated_question} ->
+        {:noreply, socket}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Failed to update question state.")}
+    end
+  end
+
   defp load_questions(socket) do
     room_id = socket.assigns.room.id
+    raised = Engagement.list_active_questions(room_id)
+    asked = Engagement.list_asked_questions(room_id)
 
-    assign(socket,
-      raised_questions: Engagement.list_raised_questions(room_id),
-      asked_questions: Engagement.list_asked_questions(room_id)
+    socket
+    |> assign(:raised_count, length(raised))
+    |> assign(:asked_count, length(asked))
+    |> stream(:raised_questions, Enum.with_index(raised, 1),
+      dom_id: fn {question, _index} -> "moderator-q-" <> question.id end,
+      reset: true
+    )
+    |> stream(:asked_questions, Enum.with_index(asked, 1),
+      dom_id: fn {question, _index} -> "moderator-q-" <> question.id end,
+      reset: true
     )
   end
 end

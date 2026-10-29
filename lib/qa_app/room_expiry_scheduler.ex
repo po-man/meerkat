@@ -89,8 +89,11 @@ defmodule QaApp.RoomExpiryScheduler do
       %QaApp.Events.Room{expires_at: expires_at} ->
         cancel_timer(state.timer)
 
+        # Fire shortly *after* the expiry boundary so the cleanup pass (which
+        # uses `expires_at <= now`) never runs a hair early and misses the
+        # very room it armed for.
         delay =
-          max(DateTime.diff(expires_at, DateTime.utc_now(), :millisecond), 0)
+          max(DateTime.diff(expires_at, DateTime.utc_now(), :millisecond), 0) + 100
 
         ref = Process.send_after(self(), :expiry_check, delay)
         %{state | timer: {ref, expires_at}}

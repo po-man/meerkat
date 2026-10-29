@@ -17,6 +17,14 @@ defmodule QaApp.Events do
     |> Repo.preload(:moderator)
   end
 
+  def list_rooms_for_moderator(moderator_id) when not is_nil(moderator_id) do
+    Room
+    |> where([r], r.moderator_id == ^moderator_id)
+    |> order_by([r], desc: r.inserted_at)
+    |> Repo.all()
+    |> Repo.preload(:moderator)
+  end
+
   def get_room!(id) do
     Room
     |> Repo.get!(id)
@@ -71,9 +79,10 @@ defmodule QaApp.Events do
 
   @doc """
   Deletes every room whose expiry timestamp is at or before now (cascading to
-  its questions and votes). Uses `<=` because the expiry scheduler fires its
-  timer exactly at the stored (second-precision) expiry boundary. Used by the
-  expiry scheduler's housekeeping.
+  its questions and votes). Uses `<=` to also catch rooms whose expiry landed
+  exactly at a (second-precision) boundary; the expiry scheduler arms its
+  timer to fire just *after* the boundary so these rooms are always included.
+  Used by the expiry scheduler's housekeeping.
   """
   def cleanup_expired_rooms(now \\ DateTime.utc_now()) do
     Room

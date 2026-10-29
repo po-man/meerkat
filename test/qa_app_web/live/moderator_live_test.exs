@@ -93,6 +93,7 @@ defmodule QaAppWeb.ModeratorLiveTest do
       html = html_response(get(conn, "/moderator/dashboard"), 200)
       assert html =~ "Render Room"
       assert html =~ "/r/render-room"
+      assert html =~ ~s(id="moderator-rooms")
     end
 
     test "moderator page shows the question queue", %{conn: conn, owner: owner, room: room} do
@@ -148,7 +149,7 @@ defmodule QaAppWeb.ModeratorLiveTest do
       assert has_element?(view, "#moderator-tabs")
       assert has_element?(view, "#moderator-tab-raised")
       assert has_element?(view, "#moderator-tab-asked")
-      assert has_element?(view, "#raised-questions-feed")
+      assert has_element?(view, "#raised-questions-feed[phx-update=stream]")
       assert has_element?(view, "#raised-questions-feed #moderator-q-#{raised_question.id}")
       refute has_element?(view, "#raised-questions-feed #moderator-q-#{asked_question.id}")
       refute has_element?(view, "#asked-questions-feed")

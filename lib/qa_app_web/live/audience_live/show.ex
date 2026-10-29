@@ -12,13 +12,18 @@ defmodule QaAppWeb.AudienceLive.Show do
          |> put_flash(:error, "Event room not found")
          |> redirect(to: "/")}
 
+      %{is_active: false} ->
+        {:ok,
+         socket
+         |> put_flash(:error, "This event is no longer active.")
+         |> redirect(to: "/")}
+
       room ->
         if socket.assigns[:session_id] && connected?(socket) do
           Events.subscribe_room(room.id)
         end
 
         session_id = socket.assigns[:session_id]
-        questions = Engagement.list_active_questions(room.id)
         user_voted_ids = Engagement.list_user_voted_question_ids(room.id, session_id)
         user_question = Engagement.get_question_by_session(room.id, session_id)
 
@@ -26,13 +31,14 @@ defmodule QaAppWeb.AudienceLive.Show do
           if user_question do
             nil
           else
-            to_form(%{"content" => ""})
+            Engagement.change_question(room, session_id, %{"content" => ""})
+            |> to_form()
           end
 
         {:ok,
          socket
          |> assign(:room, room)
-         |> assign(:questions, questions)
+         |> questions_stream()
          |> assign(:user_voted_ids, user_voted_ids)
          |> assign(:user_question, user_question)
          |> assign(:form, form)
@@ -47,8 +53,8 @@ defmodule QaAppWeb.AudienceLive.Show do
     char_count = String.length(content)
 
     changeset =
-      %QaApp.Engagement.Question{room_id: room.id, session_id: socket.assigns.session_id}
-      |> QaApp.Engagement.Question.changeset(%{"content" => content}, room.char_limit)
+      socket.assigns.session_id
+      |> then(&Engagement.change_question(room, &1, %{"content" => content}))
       |> Map.put(:action, :validate)
 
     {:noreply,
@@ -69,6 +75,7 @@ defmodule QaAppWeb.AudienceLive.Show do
          |> assign(:user_question, question)
          |> assign(:submitted?, true)
          |> assign(:form, nil)
+         |> questions_stream()
          |> put_flash(:info, "Question submitted successfully!")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
@@ -85,10 +92,14 @@ defmodule QaAppWeb.AudienceLive.Show do
     session_id = socket.assigns.session_id
     room = socket.assigns.room
 
-    case Engagement.toggle_vote(question_id, session_id) do
+    case Engagement.toggle_vote(room.id, question_id, session_id) do
       {:ok, _res} ->
         user_voted_ids = Engagement.list_user_voted_question_ids(room.id, session_id)
-        {:noreply, assign(socket, :user_voted_ids, user_voted_ids)}
+
+        {:noreply,
+         socket
+         |> assign(:user_voted_ids, user_voted_ids)
+         |> questions_stream()}
 
       {:error, :cannot_vote_own_question} ->
         {:noreply, put_flash(socket, :error, "You cannot upvote your own question.")}
@@ -99,15 +110,10 @@ defmodule QaAppWeb.AudienceLive.Show do
   end
 
   def handle_info({:question_created, _question}, socket) do
-    room = socket.assigns.room
-    questions = Engagement.list_active_questions(room.id)
-    {:noreply, assign(socket, :questions, questions)}
+    {:noreply, questions_stream(socket)}
   end
 
   def handle_info({:question_updated, question}, socket) do
-    room = socket.assigns.room
-    questions = Engagement.list_active_questions(room.id)
-
     user_question =
       if socket.assigns.user_question && socket.assigns.user_question.id == question.id do
         question
@@ -117,12 +123,29 @@ defmodule QaAppWeb.AudienceLive.Show do
 
     {:noreply,
      socket
-     |> assign(:questions, questions)
-     |> assign(:user_question, user_question)}
+     |> assign(:user_question, user_question)
+     |> questions_stream()}
   end
 
   def handle_info({:room_settings_updated, room}, socket) do
     {:noreply, assign(socket, :room, room)}
+  end
+
+  defp own_question?(user_question, question),
+    do: user_question && user_question.id == question.id
+
+  defp questions_stream(socket) do
+    socket.assigns.room.id
+    |> Engagement.list_active_questions()
+    |> Enum.with_index(1)
+    |> then(fn entries ->
+      socket
+      |> assign(:questions_count, length(entries))
+      |> stream(:questions, entries,
+        dom_id: fn {question, _index} -> "q-" <> question.id end,
+        reset: true
+      )
+    end)
   end
 
   def render(assigns) do
@@ -262,99 +285,98 @@ defmodule QaAppWeb.AudienceLive.Show do
               Audience Questions
             </h2>
             <span class="w-full sm:w-auto font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
-              {length(@questions)} open · Sorted by votes
+              {@questions_count} open · Sorted by votes
             </span>
           </div>
 
-          <%= if Enum.empty?(@questions) do %>
-            <div class="py-16 text-center">
+          <div id="questions-feed" phx-update="stream">
+            <div id="questions-empty" class="hidden only:block py-16 text-center">
               <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
                 No questions asked yet
               </p>
               <p class="mt-2 text-[13px] text-ink-3">Be the first to submit a question.</p>
             </div>
-          <% else %>
-            <div id="questions-feed">
-              <%= for {question, i} <- Enum.with_index(@questions) do %>
-                <% own? = @user_question && @user_question.id == question.id %>
 
-                <div
-                  id={"q-#{question.id}"}
-                  class={[
-                    "grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-6 border-b border-line",
-                    own? && "bg-surface -mx-2 sm:-mx-3 px-2 sm:px-3 rounded-lg"
-                  ]}
-                >
-                  <div class="col-span-1 sm:col-span-1">
-                    <span class={[
-                      "hidden sm:block font-mono text-xs tabular-nums",
-                      if(own?, do: "text-accent", else: "text-ink-3")
-                    ]}>
-                      {i + 1}
+            <div
+              :for={{id, {question, index}} <- @streams.questions}
+              id={id}
+              class={[
+                "grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-6 border-b border-line",
+                own_question?(@user_question, question) &&
+                  "bg-surface -mx-2 sm:-mx-3 px-2 sm:px-3 rounded-lg"
+              ]}
+            >
+              <div class="col-span-1 sm:col-span-1">
+                <span class={[
+                  "hidden sm:block font-mono text-xs tabular-nums",
+                  if(own_question?(@user_question, question),
+                    do: "text-accent",
+                    else: "text-ink-3"
+                  )
+                ]}>
+                  {index}
+                </span>
+              </div>
+
+              <div class="col-span-10 sm:col-span-11 flex items-start gap-4">
+                <%= if own_question?(@user_question, question) do %>
+                  <span
+                    aria-label="Upvote count for your question"
+                    class="shrink-0 w-11 h-11 rounded border border-line-strong bg-transparent text-ink-3 flex flex-col items-center justify-center gap-0.5"
+                  >
+                    <.icon name="hero-chevron-up" class="size-4" />
+                    <span class="font-mono text-xs leading-none tabular-nums">
+                      {question.vote_count}
                     </span>
-                  </div>
+                  </span>
+                <% else %>
+                  <button
+                    phx-click="toggle_vote"
+                    phx-value-id={question.id}
+                    aria-label="Upvote question"
+                    class={[
+                      "shrink-0 w-11 h-11 rounded border flex flex-col items-center justify-center gap-0.5 transition-colors duration-150",
+                      if(MapSet.member?(@user_voted_ids, question.id),
+                        do: "bg-ink border-ink text-paper",
+                        else: "border-line-strong text-ink-2 hover:border-ink hover:text-ink"
+                      )
+                    ]}
+                  >
+                    <.icon name="hero-chevron-up" class="size-4" />
+                    <span class="font-mono text-xs leading-none tabular-nums">
+                      {question.vote_count}
+                    </span>
+                  </button>
+                <% end %>
 
-                  <div class="col-span-10 sm:col-span-11 flex items-start gap-4">
-                    <%= if own? do %>
+                <div class="flex-1 min-w-0 pt-0.5">
+                  <p class="text-[17px] leading-relaxed text-ink break-words">
+                    {question.content}
+                  </p>
+                  <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                    <span>Anonymous</span>
+                    <span class="text-ink-3/40">·</span>
+                    <.local_datetime
+                      id={"question-time-#{question.id}"}
+                      datetime={question.inserted_at}
+                      format={:time}
+                      class="normal-case tracking-normal tabular-nums"
+                    />
+
+                    <%= if own_question?(@user_question, question) do %>
+                      <span class="text-ink-3/40">·</span>
                       <span
-                        aria-label="Upvote count for your question"
-                        class="shrink-0 w-11 h-11 rounded border border-line-strong bg-transparent text-ink-3 flex flex-col items-center justify-center gap-0.5"
+                        id={"your-question-#{question.id}"}
+                        class="inline-flex items-center gap-1.5 text-accent"
                       >
-                        <.icon name="hero-chevron-up" class="size-4" />
-                        <span class="font-mono text-xs leading-none tabular-nums">
-                          {question.vote_count}
-                        </span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Your question
                       </span>
-                    <% else %>
-                      <button
-                        phx-click="toggle_vote"
-                        phx-value-id={question.id}
-                        aria-label="Upvote question"
-                        class={[
-                          "shrink-0 w-11 h-11 rounded border flex flex-col items-center justify-center gap-0.5 transition-colors duration-150",
-                          if(MapSet.member?(@user_voted_ids, question.id),
-                            do: "bg-ink border-ink text-paper",
-                            else: "border-line-strong text-ink-2 hover:border-ink hover:text-ink"
-                          )
-                        ]}
-                      >
-                        <.icon name="hero-chevron-up" class="size-4" />
-                        <span class="font-mono text-xs leading-none tabular-nums">
-                          {question.vote_count}
-                        </span>
-                      </button>
                     <% end %>
-
-                    <div class="flex-1 min-w-0 pt-0.5">
-                      <p class="text-[17px] leading-relaxed text-ink break-words">
-                        {question.content}
-                      </p>
-                      <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                        <span>Anonymous</span>
-                        <span class="text-ink-3/40">·</span>
-                        <.local_datetime
-                          id={"question-time-#{question.id}"}
-                          datetime={question.inserted_at}
-                          format={:time}
-                          class="normal-case tracking-normal tabular-nums"
-                        />
-
-                        <%= if own? do %>
-                          <span class="text-ink-3/40">·</span>
-                          <span
-                            id={"your-question-#{question.id}"}
-                            class="inline-flex items-center gap-1.5 text-accent"
-                          >
-                            <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Your question
-                          </span>
-                        <% end %>
-                      </div>
-                    </div>
                   </div>
                 </div>
-              <% end %>
+              </div>
             </div>
-          <% end %>
+          </div>
         </section>
       </div>
     </QaAppWeb.Layouts.app>

@@ -28,11 +28,11 @@ defmodule QaAppWeb.SessionHTML do
               </div>
             <% end %>
 
-            <.form :let={f} for={%{}} action={@login_path} class="mt-10 space-y-5">
+            <.form for={@form} action={@login_path} class="mt-10 space-y-5">
               <%= if @setup_mode do %>
                 <div>
                   <.input
-                    field={f[:access_code]}
+                    field={@form[:access_code]}
                     type="password"
                     required
                     label="Access Code"
@@ -43,7 +43,7 @@ defmodule QaAppWeb.SessionHTML do
 
               <div>
                 <.input
-                  field={f[:username]}
+                  field={@form[:username]}
                   type="text"
                   required
                   label="Username"
@@ -53,7 +53,7 @@ defmodule QaAppWeb.SessionHTML do
 
               <div>
                 <.input
-                  field={f[:password]}
+                  field={@form[:password]}
                   type="password"
                   required
                   label="Password"
