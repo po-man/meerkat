@@ -2,35 +2,15 @@ defmodule QaAppWeb.ModeratorLive.Settings do
   use QaAppWeb, :live_view
 
   alias QaApp.Events
+  alias QaAppWeb.ModeratorLive.RoomAuth
 
-  def mount(%{"slug" => slug}, _session, socket) do
-    case Events.get_room_by_slug(slug) do
-      nil ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Event room not found")
-         |> redirect(to: "/")}
+  def mount(params, _session, socket) do
+    case RoomAuth.authorize(socket, params) do
+      {:ok, socket} ->
+        {:ok, socket |> assign(:settings_form, settings_form(socket.assigns.room))}
 
-      room ->
-        current_user = socket.assigns[:current_user]
-
-        if current_user && (current_user.role == :admin || current_user.id == room.moderator_id) do
-          if connected?(socket) do
-            Events.subscribe_room(room.id)
-          end
-
-          settings_form = to_form(Events.change_room(room))
-
-          {:ok,
-           socket
-           |> assign(:room, room)
-           |> assign(:settings_form, settings_form)}
-        else
-          {:ok,
-           socket
-           |> put_flash(:error, "Unauthorized access to this room dashboard.")
-           |> redirect(to: "/")}
-        end
+      {:redirect, socket} ->
+        {:ok, socket}
     end
   end
 
@@ -42,7 +22,7 @@ defmodule QaAppWeb.ModeratorLive.Settings do
         {:noreply,
          socket
          |> assign(:room, updated_room)
-         |> assign(:settings_form, to_form(Events.change_room(updated_room)))
+         |> assign(:settings_form, settings_form(updated_room))
          |> put_flash(:info, "Room settings updated successfully.")}
 
       {:error, changeset} ->
@@ -54,8 +34,10 @@ defmodule QaAppWeb.ModeratorLive.Settings do
     {:noreply,
      socket
      |> assign(:room, room)
-     |> assign(:settings_form, to_form(Events.change_room(room)))}
+     |> assign(:settings_form, settings_form(room))}
   end
+
+  defp settings_form(room), do: Events.change_room(room) |> to_form()
 
   def render(assigns) do
     ~H"""

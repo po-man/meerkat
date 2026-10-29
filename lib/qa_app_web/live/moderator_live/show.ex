@@ -1,37 +1,20 @@
 defmodule QaAppWeb.ModeratorLive.Show do
   use QaAppWeb, :live_view
 
-  alias QaApp.Events
   alias QaApp.Engagement
+  alias QaAppWeb.ModeratorLive.RoomAuth
 
-  def mount(%{"slug" => slug}, _session, socket) do
-    case Events.get_room_by_slug(slug) do
-      nil ->
+  def mount(params, _session, socket) do
+    case RoomAuth.authorize(socket, params) do
+      {:ok, socket} ->
         {:ok,
          socket
-         |> put_flash(:error, "Event room not found")
-         |> redirect(to: "/")}
+         |> assign(:show_qr_modal?, false)
+         |> assign(:tab, :raised)
+         |> load_questions()}
 
-      room ->
-        current_user = socket.assigns[:current_user]
-
-        if current_user && (current_user.role == :admin || current_user.id == room.moderator_id) do
-          if connected?(socket) do
-            Events.subscribe_room(room.id)
-          end
-
-          {:ok,
-           socket
-           |> assign(:room, room)
-           |> assign(:show_qr_modal?, false)
-           |> assign(:tab, :raised)
-           |> load_questions()}
-        else
-          {:ok,
-           socket
-           |> put_flash(:error, "Unauthorized access to this room dashboard.")
-           |> redirect(to: "/")}
-        end
+      {:redirect, socket} ->
+        {:ok, socket}
     end
   end
 
@@ -55,11 +38,7 @@ defmodule QaAppWeb.ModeratorLive.Show do
     {:noreply, assign(socket, :show_qr_modal?, not socket.assigns.show_qr_modal?)}
   end
 
-  def handle_info({:question_created, _question}, socket) do
-    {:noreply, load_questions(socket)}
-  end
-
-  def handle_info({:question_updated, _question}, socket) do
+  def handle_info({tag, _question}, socket) when tag in [:question_created, :question_updated] do
     {:noreply, load_questions(socket)}
   end
 
