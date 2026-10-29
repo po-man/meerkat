@@ -90,9 +90,13 @@ defmodule QaAppWeb.AdminLive.Index do
 
   def handle_event("create_room", %{"room" => room_params}, socket) do
     room_params =
-      if room_params["moderator_id"] == "",
-        do: Map.delete(room_params, "moderator_id"),
-        else: room_params
+      room_params
+      |> normalize_is_active()
+      |> then(fn params ->
+        if params["moderator_id"] == "",
+          do: Map.delete(params, "moderator_id"),
+          else: params
+      end)
 
     case Events.create_room(room_params) do
       {:ok, _room} ->
@@ -112,9 +116,13 @@ defmodule QaAppWeb.AdminLive.Index do
     room = socket.assigns.editing_room
 
     room_params =
-      if room_params["moderator_id"] == "",
-        do: Map.put(room_params, "moderator_id", nil),
-        else: room_params
+      room_params
+      |> normalize_is_active()
+      |> then(fn params ->
+        if params["moderator_id"] == "",
+          do: Map.put(params, "moderator_id", nil),
+          else: params
+      end)
 
     case Events.update_room(room, room_params) do
       {:ok, _updated_room} ->
@@ -157,6 +165,19 @@ defmodule QaAppWeb.AdminLive.Index do
     room = Events.get_room!(id)
     {:ok, _} = Events.delete_room(room)
     {:noreply, stream_rooms(socket)}
+  end
+
+  def handle_event("toggle_room_active", %{"id" => id}, socket) do
+    room = Events.get_room!(id)
+
+    case Events.update_room(room, %{"is_active" => !room.is_active}) do
+      {:ok, _updated_room} ->
+        {:noreply, stream_rooms(socket)}
+
+      {:error, changeset} ->
+        errors = Enum.map_join(changeset.errors, ", ", fn {key, {msg, _}} -> "#{key} #{msg}" end)
+        {:noreply, put_flash(socket, :error, "Failed to update room status: #{errors}")}
+    end
   end
 
   def render(assigns) do
@@ -229,6 +250,9 @@ defmodule QaAppWeb.AdminLive.Index do
                     Live Visitors
                   </th>
                   <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
+                    Status
+                  </th>
+                  <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
                     Expires
                   </th>
                   <th class="py-3 border-b border-line-strong text-right">
@@ -267,6 +291,21 @@ defmodule QaAppWeb.AdminLive.Index do
                         <span class="text-ink-3">/ {room.max_visitors}</span>
                       <% end %>
                     </span>
+                  </td>
+                  <td class="py-4 pr-4 align-top">
+                    <div class="flex items-center gap-3">
+                      <.status_toggle room={room} />
+                      <span class={[
+                        "font-mono text-[11px] uppercase tracking-[0.14em]",
+                        if(room.is_active, do: "text-ink-2", else: "text-ink-3")
+                      ]}>
+                        <%= if room.is_active do %>
+                          Active
+                        <% else %>
+                          Inactive
+                        <% end %>
+                      </span>
+                    </div>
                   </td>
                   <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
                     <.local_datetime id={"room-expiry-#{room.id}"} datetime={room.expires_at} />
@@ -371,6 +410,12 @@ defmodule QaAppWeb.AdminLive.Index do
                 (newest first) if you lower this below the current count.
               </p>
 
+              <.toggle
+                field={@edit_room_form[:is_active]}
+                label="Room is open"
+                hint="Visitors can join and submit questions while the room is active."
+              />
+
               <.input
                 field={@edit_room_form[:intro_text]}
                 type="textarea"
@@ -467,6 +512,12 @@ defmodule QaAppWeb.AdminLive.Index do
                 label="Room Expiry (auto-cleanup)"
               />
 
+              <.toggle
+                field={@room_form[:is_active]}
+                label="Room is open"
+                hint="Visitors can join and submit questions while the room is active."
+              />
+
               <div class="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -539,6 +590,21 @@ defmodule QaAppWeb.AdminLive.Index do
       </div>
     </QaAppWeb.Layouts.app>
     """
+  end
+
+  # The toggle renders a hidden `false` plus a visible checkbox for the same
+  # field, so LiveView may deliver `is_active` as a plain string or (when
+  # checked) as the list ["false", "true"]. Coerce it to a single value the
+  # changeset can cast.
+  defp normalize_is_active(params) do
+    case Map.get(params, "is_active") do
+      nil -> params
+      ["false", "true"] -> Map.put(params, "is_active", "true")
+      ["true"] -> Map.put(params, "is_active", "true")
+      value when value in [true, "true"] -> Map.put(params, "is_active", "true")
+      value when value in [false, "false"] -> Map.put(params, "is_active", "false")
+      _other -> Map.put(params, "is_active", "false")
+    end
   end
 
   defp stream_rooms(socket) do

@@ -30,7 +30,7 @@ defmodule QaAppWeb.RoomFullControllerTest do
       assert redirected_to(conn) == "/"
     end
 
-    test "redirects home for an inactive room" do
+    test "renders the room full page for an inactive room" do
       {:ok, room} =
         Events.create_room(%{
           "slug" => "dead-room",
@@ -44,7 +44,12 @@ defmodule QaAppWeb.RoomFullControllerTest do
       |> QaApp.Repo.update!()
 
       conn = get(build_conn(), "/r/dead-room/full")
-      assert redirected_to(conn) == "/"
+
+      assert Plug.Conn.get_resp_header(conn, "refresh") == ["20; url=/r/dead-room"]
+
+      html = html_response(conn, 200)
+      assert html =~ "This room is at capacity"
+      assert html =~ "Dead Room"
     end
   end
 end

@@ -15,6 +15,12 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
     {:noreply, stream_rooms(socket)}
   end
 
+  def handle_event("toggle_room_active", %{"id" => id}, socket) do
+    room = Events.get_room!(id)
+    {:ok, _} = Events.update_room(room, %{"is_active" => !room.is_active})
+    {:noreply, stream_rooms(socket)}
+  end
+
   defp stream_rooms(socket) do
     rooms = rooms_for(socket.assigns.current_user)
 
@@ -76,15 +82,17 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
               <p class="mt-0.5 font-mono text-xs text-ink-3">/r/{room.slug}</p>
             </div>
 
-            <div class="col-span-4 sm:col-span-2 flex sm:hidden">
-              <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Active
-              </span>
-            </div>
-
-            <div class="col-span-4 sm:col-span-2 hidden sm:flex">
-              <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> Active
+            <div class="col-span-4 sm:col-span-2 flex items-center gap-2.5">
+              <.status_toggle room={room} />
+              <span class={[
+                "font-mono text-[11px] uppercase tracking-[0.14em]",
+                if(room.is_active, do: "text-ink-2", else: "text-ink-3")
+              ]}>
+                <%= if room.is_active do %>
+                  Active
+                <% else %>
+                  Inactive
+                <% end %>
               </span>
             </div>
 

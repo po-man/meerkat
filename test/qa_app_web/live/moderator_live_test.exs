@@ -96,6 +96,21 @@ defmodule QaAppWeb.ModeratorLiveTest do
       assert html =~ ~s(id="moderator-rooms")
     end
 
+    test "room dashboard shows a status switch that toggles the active state", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/dashboard")
+
+      assert has_element?(view, "#room-active-toggle-#{room.id}")
+
+      view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
+
+      refute Events.get_room!(room.id).is_active
+    end
+
     test "moderator page shows the question queue", %{conn: conn, owner: owner, room: room} do
       conn = login_as(conn, owner.username)
 

@@ -135,6 +135,24 @@ defmodule QaAppWeb.ModeratorLiveSettingsTest do
       assert html =~ "must be at least 1"
     end
 
+    test "toggles the room active status via the settings form", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}/settings")
+
+      assert has_element?(view, ~s(#settings-form input[name="room[is_active]"]))
+
+      view
+      |> form("#settings-form", room: %{"title" => "Valid Title", "is_active" => "false"})
+      |> render_submit()
+
+      assert render(view) =~ "Room settings updated successfully."
+      assert Events.get_room!(room.id).is_active == false
+    end
+
     test "redirects a moderator who does not own the room", %{conn: conn, room: room} do
       {:ok, other} =
         Accounts.create_moderator(%{"username" => "other-mod", "password" => "secret123"})

@@ -354,6 +354,127 @@ defmodule QaAppWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Renders a switch-style toggle bound to a boolean form field, such as a
+  room's `is_active` status.
+
+  Unlike `input/1`, the control is a sliding switch that matches the app's
+  design language while keeping the standard hidden-false / visible-checkbox
+  semantics so the value round-trips through the form.
+
+  ## Examples
+
+      <.toggle field={@form[:is_active]} label="Room is open" hint="Visitors can join while this is on." />
+      <.toggle name="room[is_active]" value={@active} label="Room is open" />
+  """
+  attr :id, :any, default: nil
+  attr :name, :any
+  attr :label, :string, default: nil
+  attr :hint, :string, default: nil
+  attr :value, :any
+
+  attr :field, Phoenix.HTML.FormField,
+    doc: "a form field struct retrieved from the form, for example: @form[:is_active]"
+
+  attr :errors, :list, default: []
+  attr :checked, :boolean, doc: "the checked flag for the toggle"
+  attr :rest, :global, include: ~w(disabled form)
+
+  def toggle(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
+    errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
+
+    assigns
+    |> assign(field: nil, id: assigns[:id] || field.id)
+    |> assign(:errors, Enum.map(errors, &translate_error(&1)))
+    |> assign_new(:name, fn -> field.name end)
+    |> assign_new(:checked, fn -> Phoenix.HTML.Form.normalize_value("checkbox", field.value) end)
+    |> toggle()
+  end
+
+  def toggle(assigns) do
+    assigns =
+      assign_new(assigns, :checked, fn ->
+        Phoenix.HTML.Form.normalize_value("checkbox", assigns[:value])
+      end)
+
+    ~H"""
+    <div>
+      <div class="flex items-center justify-between gap-6">
+        <div class="min-w-0">
+          <p :if={@label} class="text-sm font-medium text-ink">{@label}</p>
+          <p :if={@hint} class="mt-1 text-xs leading-relaxed text-ink-3">{@hint}</p>
+        </div>
+        <div class="relative h-5 w-9 shrink-0">
+          <input
+            type="hidden"
+            name={@name}
+            value="false"
+            disabled={@rest[:disabled]}
+            form={@rest[:form]}
+          />
+          <input
+            type="checkbox"
+            id={@id}
+            name={@name}
+            value="true"
+            checked={@checked}
+            class="peer sr-only"
+            disabled={@rest[:disabled]}
+            form={@rest[:form]}
+          />
+          <div class="absolute inset-0 rounded-full border border-line-strong bg-surface transition-colors duration-150 peer-checked:border-accent peer-checked:bg-accent">
+          </div>
+          <span class="absolute top-1/2 left-0.5 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-paper border border-line-strong transition-transform duration-150 peer-checked:translate-x-[16px] peer-checked:border-transparent"></span>
+        </div>
+      </div>
+      <.error :for={msg <- @errors}>{msg}</.error>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders a compact switch that flips a room's active/inactive status
+  directly from a list row.
+
+  The switch posts the `toggle_room_active` event with the room's id, which
+  the admin and moderator listings handle server-side.
+
+  ## Examples
+
+      <.status_toggle room={room} />
+  """
+  attr :room, :map, required: true
+
+  def status_toggle(assigns) do
+    ~H"""
+    <button
+      type="button"
+      role="switch"
+      id={"room-active-toggle-#{@room.id}"}
+      aria-checked={to_string(@room.is_active)}
+      aria-label={"Toggle #{@room.title} active state"}
+      title={if(@room.is_active, do: "Deactivate room", else: "Activate room")}
+      phx-click="toggle_room_active"
+      phx-value-id={@room.id}
+      class={[
+        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-150",
+        if(@room.is_active,
+          do: "bg-accent border-accent",
+          else: "bg-surface border-line-strong hover:border-ink"
+        )
+      ]}
+    >
+      <span class={[
+        "inline-block h-3.5 w-3.5 rounded-full border transition-transform duration-150",
+        if(@room.is_active,
+          do: "translate-x-[16px] bg-paper border-accent",
+          else: "translate-x-[2px] bg-paper border-line-strong"
+        )
+      ]}></span>
+    </button>
+    """
+  end
+
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""

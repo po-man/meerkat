@@ -16,6 +16,7 @@ defmodule QaAppWeb.ModeratorLive.Settings do
 
   def handle_event("save_settings", %{"room" => room_params}, socket) do
     room = socket.assigns.room
+    room_params = normalize_is_active(room_params)
 
     case Events.update_room(room, room_params) do
       {:ok, updated_room} ->
@@ -38,6 +39,21 @@ defmodule QaAppWeb.ModeratorLive.Settings do
   end
 
   defp settings_form(room), do: Events.change_room(room) |> to_form()
+
+  # The toggle renders a hidden `false` plus a visible checkbox for the same
+  # field, so LiveView may deliver `is_active` as a plain string or (when
+  # checked) as the list ["false", "true"]. Coerce it to a single value the
+  # changeset can cast.
+  defp normalize_is_active(params) do
+    case Map.get(params, "is_active") do
+      nil -> params
+      ["false", "true"] -> Map.put(params, "is_active", "true")
+      ["true"] -> Map.put(params, "is_active", "true")
+      value when value in [true, "true"] -> Map.put(params, "is_active", "true")
+      value when value in [false, "false"] -> Map.put(params, "is_active", "false")
+      _other -> Map.put(params, "is_active", "false")
+    end
+  end
 
   def render(assigns) do
     ~H"""
@@ -127,6 +143,14 @@ defmodule QaAppWeb.ModeratorLive.Settings do
                 Leave empty for unlimited. The room stops admitting new visitors
                 once this many people are connected.
               </p>
+            </div>
+
+            <div>
+              <.toggle
+                field={@settings_form[:is_active]}
+                label="Room is open"
+                hint="Visitors can join and submit questions while the room is active. Turning the room off keeps current visitors connected, showing them a waiting page until it is ready again."
+              />
             </div>
 
             <button

@@ -88,6 +88,22 @@ defmodule QaApp.RoomCapacityTest do
 
       refute_received {:room_visitors_expelled, _}
     end
+
+    test "does not expel live visitors when the room is deactivated" do
+      {:ok, room} = create_room("cap-room-inactive", 250)
+
+      track_visitor(room, "v-1", 1)
+      track_visitor(room, "v-2", 2)
+
+      Phoenix.PubSub.subscribe(QaApp.PubSub, Presence.topic(room))
+
+      assert {:ok, updated_room} = Events.update_room(room, %{"is_active" => "false"})
+      assert updated_room.is_active == false
+
+      # Waiting visitors keep their connection and stay counted as live.
+      refute_received {:room_visitors_expelled, _}
+      assert Presence.count(room.id) == 2
+    end
   end
 
   describe "presence diffs" do

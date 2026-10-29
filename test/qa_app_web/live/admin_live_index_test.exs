@@ -224,6 +224,97 @@ defmodule QaAppWeb.AdminLiveIndexTest do
     end
   end
 
+  describe "room status toggle" do
+    test "shows a per-row status switch and label in the rooms table", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "status-room",
+          "title" => "Status Room",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+
+      assert has_element?(view, "#room-active-toggle-#{room.id}")
+      html = view |> element("#room-active-toggle-#{room.id}") |> render()
+      assert html =~ ~s(role="switch")
+      assert html =~ ~s(aria-checked="true")
+    end
+
+    test "toggles a room between active and inactive from the rooms table", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "toggle-room",
+          "title" => "Toggle Room",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+
+      view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
+      refute Events.get_room!(room.id).is_active
+
+      html = view |> element("#room-active-toggle-#{room.id}") |> render()
+      assert html =~ ~s(aria-checked="false")
+
+      view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
+      assert Events.get_room!(room.id).is_active
+    end
+
+    test "create room modal can start a room as inactive", %{conn: conn} do
+      view = open_admin(conn)
+      view |> element(~s(button[phx-click="open_create_room"])) |> render_click()
+
+      assert has_element?(view, ~s(#create-room-form input[name="room[is_active]"]))
+      assert render(view) =~ ~s(id="room_is_active")
+
+      view
+      |> form("#create-room-form",
+        room: %{
+          "slug" => "inactive-new",
+          "title" => "Inactive New",
+          "moderator_id" => "",
+          "char_limit" => "320",
+          "expires_in" => "7 days",
+          "is_active" => "false"
+        }
+      )
+      |> render_submit()
+
+      assert render(view) =~ "Room created successfully."
+      assert Events.get_room_by_slug("inactive-new").is_active == false
+    end
+
+    test "configure room modal can change the active status", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "config-toggle",
+          "title" => "Config Toggle",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+      view |> element(~s(button[phx-click="open_configure_room"])) |> render_click()
+
+      view
+      |> form("#configure-room-form",
+        room: %{
+          "title" => "Config Toggle",
+          "slug" => "config-toggle",
+          "char_limit" => "320",
+          "is_active" => "false"
+        }
+      )
+      |> render_submit()
+
+      assert render(view) =~ "Room configured successfully."
+      assert Events.get_room!(room.id).is_active == false
+    end
+  end
+
   defp assert_eventually(fun, timeout \\ 2_000) do
     if fun.() do
       :ok
