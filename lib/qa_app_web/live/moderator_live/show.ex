@@ -99,7 +99,7 @@ defmodule QaAppWeb.ModeratorLive.Show do
                   "font-mono text-[11px] tabular-nums",
                   if(@tab == :raised, do: "text-paper/60", else: "text-ink-3/60")
                 ]}>
-                  {length(@raised_questions)}
+                  {@raised_count}
                 </span>
               </.link>
 
@@ -121,50 +121,53 @@ defmodule QaAppWeb.ModeratorLive.Show do
                   "font-mono text-[11px] tabular-nums",
                   if(@tab == :asked, do: "text-paper/60", else: "text-ink-3/60")
                 ]}>
-                  {length(@asked_questions)}
+                  {@asked_count}
                 </span>
               </.link>
             </div>
 
             <span class="w-full sm:w-auto font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 tabular-nums">
-              {if(@tab == :raised, do: length(@raised_questions), else: length(@asked_questions))} total · Sorted by votes
+              {if(@tab == :raised, do: @raised_count, else: @asked_count)} total · Sorted by votes
             </span>
           </div>
 
           <div id="moderator-questions-feed">
             <%= if @tab == :raised do %>
-              <div id="raised-questions-feed">
-                <%= if Enum.empty?(@raised_questions) do %>
-                  <div class="py-16 text-center">
-                    <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                      No raised questions yet
-                    </p>
-                    <p class="mt-2 text-[13px] text-ink-3">
-                      Questions submitted by the audience will appear here.
-                    </p>
-                  </div>
-                <% else %>
-                  <%= for {question, i} <- Enum.with_index(@raised_questions) do %>
-                    <.moderator_question question={question} index={i + 1} />
-                  <% end %>
-                <% end %>
+              <div id="raised-questions-feed" phx-update="stream">
+                <div id="raised-empty" class="hidden only:block py-16 text-center">
+                  <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                    No raised questions yet
+                  </p>
+                  <p class="mt-2 text-[13px] text-ink-3">
+                    Questions submitted by the audience will appear here.
+                  </p>
+                </div>
+
+                <.moderator_question
+                  :for={{id, {question, index}} <- @streams.raised_questions}
+                  id={id}
+                  question={question}
+                  index={index}
+                />
               </div>
             <% else %>
-              <div id="asked-questions-feed">
-                <%= if Enum.empty?(@asked_questions) do %>
-                  <div class="py-16 text-center">
-                    <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                      No asked questions yet
-                    </p>
-                    <p class="mt-2 text-[13px] text-ink-3">
-                      Questions you mark as asked will appear here.
-                    </p>
-                  </div>
-                <% else %>
-                  <%= for {question, i} <- Enum.with_index(@asked_questions) do %>
-                    <.moderator_question question={question} index={i + 1} asked? />
-                  <% end %>
-                <% end %>
+              <div id="asked-questions-feed" phx-update="stream">
+                <div id="asked-empty" class="hidden only:block py-16 text-center">
+                  <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                    No asked questions yet
+                  </p>
+                  <p class="mt-2 text-[13px] text-ink-3">
+                    Questions you mark as asked will appear here.
+                  </p>
+                </div>
+
+                <.moderator_question
+                  :for={{id, {question, index}} <- @streams.asked_questions}
+                  id={id}
+                  question={question}
+                  index={index}
+                  asked?
+                />
               </div>
             <% end %>
           </div>
@@ -227,10 +230,19 @@ defmodule QaAppWeb.ModeratorLive.Show do
 
   defp load_questions(socket) do
     room_id = socket.assigns.room.id
+    raised = Engagement.list_active_questions(room_id)
+    asked = Engagement.list_asked_questions(room_id)
 
-    assign(socket,
-      raised_questions: Engagement.list_active_questions(room_id),
-      asked_questions: Engagement.list_asked_questions(room_id)
+    socket
+    |> assign(:raised_count, length(raised))
+    |> assign(:asked_count, length(asked))
+    |> stream(:raised_questions, Enum.with_index(raised, 1),
+      dom_id: fn {question, _index} -> "moderator-q-" <> question.id end,
+      reset: true
+    )
+    |> stream(:asked_questions, Enum.with_index(asked, 1),
+      dom_id: fn {question, _index} -> "moderator-q-" <> question.id end,
+      reset: true
     )
   end
 end

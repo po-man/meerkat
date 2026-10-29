@@ -148,7 +148,7 @@ defmodule QaAppWeb.ModeratorLiveTest do
       assert has_element?(view, "#moderator-tabs")
       assert has_element?(view, "#moderator-tab-raised")
       assert has_element?(view, "#moderator-tab-asked")
-      assert has_element?(view, "#raised-questions-feed")
+      assert has_element?(view, "#raised-questions-feed[phx-update=stream]")
       assert has_element?(view, "#raised-questions-feed #moderator-q-#{raised_question.id}")
       refute has_element?(view, "#raised-questions-feed #moderator-q-#{asked_question.id}")
       refute has_element?(view, "#asked-questions-feed")

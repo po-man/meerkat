@@ -21,13 +21,11 @@ defmodule QaAppWeb.Components.QuestionFeed do
   attr :question, QaApp.Engagement.Question, required: true
   attr :index, :integer, required: true
   attr :asked?, :boolean, default: false
+  attr :id, :string, required: true, doc: "the stream item's DOM id"
 
   def moderator_question(assigns) do
     ~H"""
-    <div
-      id={"moderator-q-#{@question.id}"}
-      class="grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-5 border-b border-line"
-    >
+    <div id={@id} class="grid grid-cols-12 gap-x-4 sm:gap-x-6 items-start py-5 border-b border-line">
       <div class={if(@asked?, do: "col-span-2 sm:col-span-1", else: "col-span-1 sm:col-span-1")}>
         <span class="font-mono text-xs text-ink-3 tabular-nums">{@index}</span>
       </div>
