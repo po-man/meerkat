@@ -26,7 +26,8 @@ defmodule QaAppWeb.AdminLive.Index do
      |> assign(:edit_room_form, nil)
      |> assign(:show_create_room_modal?, false)
      |> assign(:show_create_moderator_modal?, false)
-     |> assign(:show_configure_room_modal?, false)}
+     |> assign(:show_configure_room_modal?, false)
+     |> assign(:moderator_form, to_form(%{"username" => "", "password" => ""}, as: :moderator))}
   end
 
   def handle_info({:room_expired, _room_id}, socket) do
@@ -439,18 +440,21 @@ defmodule QaAppWeb.AdminLive.Index do
               </h3>
             </div>
 
-              <.form :let={f} for={%{}} action="#" phx-submit="create_moderator" class="space-y-4">
+              <.form
+                for={@moderator_form}
+                id="create-moderator-form"
+                phx-submit="create_moderator"
+                class="space-y-4"
+              >
                 <.input
-                  field={f[:username]}
-                  name="moderator[username]"
+                  field={@moderator_form[:username]}
                   type="text"
                   required
                   label="Username"
                 />
 
                 <.input
-                  field={f[:password]}
-                  name="moderator[password]"
+                  field={@moderator_form[:password]}
                   type="password"
                   required
                   label="Initial Password"

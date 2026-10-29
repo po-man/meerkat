@@ -15,6 +15,7 @@ defmodule QaAppWeb.SessionController do
         render(conn, :new,
           setup_mode: !Accounts.admin_exists?(),
           login_path: AdminAuth.secret_path(),
+          form: Phoenix.Component.to_form(%{}),
           error_message: nil
         )
 
@@ -78,6 +79,7 @@ defmodule QaAppWeb.SessionController do
     render(conn, :new,
       setup_mode: setup_mode,
       login_path: AdminAuth.secret_path(),
+      form: Phoenix.Component.to_form(%{}),
       error_message: error_message
     )
   end
