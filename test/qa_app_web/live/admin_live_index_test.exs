@@ -254,32 +254,34 @@ defmodule QaAppWeb.AdminLiveIndexTest do
       view = open_admin(conn)
 
       # The first click on an active room only arms the confirmation; the room
-      # is not deactivated yet.
+      # is not deactivated yet. It pops up as a centered modal instead of
+      # expanding the table row.
       view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
       assert Events.get_room!(room.id).is_active == true
-      assert has_element?(view, ~s(#row-#{room.id}-confirm))
+      assert has_element?(view, "#deactivate-confirm-modal")
+      assert has_element?(view, ~s(#room-deactivate-confirm))
 
       # Cancelling keeps the room active and dismisses the prompt.
       view
-      |> element(~s(#row-#{room.id}-confirm button[phx-click="cancel_room_inactive"]))
+      |> element(~s(#room-deactivate-confirm button[phx-click="cancel_room_inactive"]))
       |> render_click()
 
       assert Events.get_room!(room.id).is_active == true
-      refute has_element?(view, ~s(#row-#{room.id}-confirm))
+      refute has_element?(view, ~s(#room-deactivate-confirm))
 
       # Arming again and confirming deactivates the room.
       view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
-      assert has_element?(view, ~s(#row-#{room.id}-confirm))
+      assert has_element?(view, ~s(#room-deactivate-confirm))
 
       view
-      |> element(~s(#row-#{room.id}-confirm button[phx-click="confirm_room_inactive"]))
+      |> element(~s(#room-deactivate-confirm button[phx-click="confirm_room_inactive"]))
       |> render_click()
 
       refute Events.get_room!(room.id).is_active
 
       html = view |> element("#room-active-toggle-#{room.id}") |> render()
       assert html =~ ~s(aria-checked="false")
-      refute has_element?(view, ~s(#row-#{room.id}-confirm))
+      refute has_element?(view, ~s(#room-deactivate-confirm))
     end
 
     test "opens an inactive room with a single click from the table", %{conn: conn} do
@@ -295,7 +297,7 @@ defmodule QaAppWeb.AdminLiveIndexTest do
 
       view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
       assert Events.get_room!(room.id).is_active == true
-      refute has_element?(view, ~s(#row-#{room.id}-confirm))
+      refute has_element?(view, ~s(#room-deactivate-confirm))
     end
 
     test "auto-cancels the armed deactivation confirmation", %{conn: conn} do
@@ -310,13 +312,15 @@ defmodule QaAppWeb.AdminLiveIndexTest do
       view = open_admin(conn)
 
       view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
-      assert has_element?(view, ~s(#row-#{room.id}-confirm))
+      assert has_element?(view, "#deactivate-confirm-modal")
+      assert has_element?(view, ~s(#room-deactivate-confirm))
 
       # The timeout fires (simulated directly) and cancels the prompt.
       send(view.pid, :reset_room_confirm)
       render(view)
 
-      refute has_element?(view, ~s(#row-#{room.id}-confirm))
+      refute has_element?(view, "#deactivate-confirm-modal")
+      refute has_element?(view, ~s(#room-deactivate-confirm))
       assert Events.get_room!(room.id).is_active == true
     end
 

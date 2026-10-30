@@ -12,7 +12,11 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
       Events.subscribe_rooms()
     end
 
-    {:ok, socket |> assign(:confirm_deactivate_id, nil) |> stream_rooms()}
+    {:ok,
+     socket
+     |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)
+     |> stream_rooms()}
   end
 
   def handle_info({:room_expired, _room_id}, socket) do
@@ -26,13 +30,18 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
     {:noreply,
      socket
      |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)
      |> stream_rooms()}
   end
 
   # The armed "deactivate room" confirmation timed out; cancel it so an
   # accidental close can't happen after the moderator walked away.
   def handle_info(:reset_room_confirm, socket) do
-    {:noreply, socket |> assign(:confirm_deactivate_id, nil) |> stream_rooms()}
+    {:noreply,
+     socket
+     |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)
+     |> stream_rooms()}
   end
 
   def handle_event("toggle_room_active", %{"id" => id}, socket) do
@@ -42,7 +51,12 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
     # moderator can't accidentally hide questions from visitors.
     if room.is_active do
       Process.send_after(self(), :reset_room_confirm, @deactivate_confirm_timeout)
-      {:noreply, socket |> assign(:confirm_deactivate_id, room.id) |> stream_rooms()}
+
+      {:noreply,
+       socket
+       |> assign(:confirm_deactivate_id, room.id)
+       |> assign(:confirm_deactivate_room, room)
+       |> stream_rooms()}
     else
       case update_room_status(socket, room, true) do
         {:ok, socket} -> {:noreply, stream_rooms(socket)}
@@ -63,7 +77,9 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
   def handle_event("cancel_room_inactive", %{"id" => id}, socket) do
     socket =
       if socket.assigns[:confirm_deactivate_id] == id do
-        assign(socket, :confirm_deactivate_id, nil)
+        socket
+        |> assign(:confirm_deactivate_id, nil)
+        |> assign(:confirm_deactivate_room, nil)
       else
         socket
       end
@@ -71,10 +87,22 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
     {:noreply, stream_rooms(socket)}
   end
 
+  # Closes the centered deactivate-confirmation modal, e.g. from its close
+  # button or outside clicks; the panel's own controls use `cancel_room_inactive`.
+  def handle_event("close_deactivate_confirm", _, socket) do
+    {:noreply,
+     socket
+     |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)}
+  end
+
   defp update_room_status(socket, room, is_active) do
     case Events.update_room(room, %{"is_active" => is_active}) do
       {:ok, _updated_room} ->
-        {:ok, assign(socket, :confirm_deactivate_id, nil)}
+        {:ok,
+         socket
+         |> assign(:confirm_deactivate_id, nil)
+         |> assign(:confirm_deactivate_room, nil)}
 
       {:error, changeset} ->
         errors = Enum.map_join(changeset.errors, ", ", fn {key, {msg, _}} -> "#{key} #{msg}" end)
@@ -82,6 +110,7 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
         {:error,
          socket
          |> assign(:confirm_deactivate_id, nil)
+         |> assign(:confirm_deactivate_room, nil)
          |> put_flash(:error, "Failed to update room status: #{errors}")}
     end
   end
@@ -177,15 +206,18 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
                 <.icon name="hero-arrow-top-right-on-square" class="size-4" />
               </.link>
             </div>
-
-            <%= if @confirm_deactivate_id == room.id do %>
-              <div class="col-span-12 mt-2">
-                <.deactivate_confirm room={room} id_prefix={"row-#{room.id}"} />
-              </div>
-            <% end %>
           </div>
         </div>
       </div>
+
+      <!-- Deactivate Room Confirmation Modal -->
+      <%= if @confirm_deactivate_room do %>
+        <.modal close_event="close_deactivate_confirm">
+          <div id="deactivate-confirm-modal">
+            <.deactivate_confirm room={@confirm_deactivate_room} variant="modal" />
+          </div>
+        </.modal>
+      <% end %>
     </QaAppWeb.Layouts.app>
     """
   end

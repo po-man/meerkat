@@ -106,14 +106,16 @@ defmodule QaAppWeb.ModeratorLiveTest do
 
       assert has_element?(view, "#room-active-toggle-#{room.id}")
 
-      # First click only arms the confirmation; the room stays active.
+      # First click only arms the confirmation; the room stays active. It
+      # pops up as a centered modal instead of expanding the room row.
       view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
       assert Events.get_room!(room.id).is_active == true
-      assert has_element?(view, ~s(#row-#{room.id}-confirm))
+      assert has_element?(view, "#deactivate-confirm-modal")
+      assert has_element?(view, ~s(#room-deactivate-confirm))
 
       # Confirming deactivates the room.
       view
-      |> element(~s(#row-#{room.id}-confirm button[phx-click="confirm_room_inactive"]))
+      |> element(~s(#room-deactivate-confirm button[phx-click="confirm_room_inactive"]))
       |> render_click()
 
       refute Events.get_room!(room.id).is_active
@@ -134,7 +136,7 @@ defmodule QaAppWeb.ModeratorLiveTest do
       view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
 
       assert Events.get_room!(room.id).is_active == true
-      refute has_element?(view, ~s(#row-#{room.id}-confirm))
+      refute has_element?(view, ~s(#room-deactivate-confirm))
     end
 
     test "room dashboard live updates the status switch when the room changes elsewhere", %{

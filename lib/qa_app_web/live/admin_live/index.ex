@@ -31,6 +31,7 @@ defmodule QaAppWeb.AdminLive.Index do
      |> assign(:show_create_room_modal?, false)
      |> assign(:show_create_moderator_modal?, false)
      |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)
      |> assign(:show_configure_room_modal?, false)
      |> assign(:moderator_form, to_form(%{"username" => "", "password" => ""}, as: :moderator))}
   end
@@ -65,13 +66,17 @@ defmodule QaAppWeb.AdminLive.Index do
     {:noreply,
      socket
      |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)
      |> stream_rooms()}
   end
 
   # The armed "deactivate room" confirmation timed out; cancel it so an
   # accidental close can't happen after the moderator walked away.
   def handle_info(:reset_room_confirm, socket) do
-    {:noreply, stream_rooms(socket) |> assign(:confirm_deactivate_id, nil)}
+    {:noreply,
+     stream_rooms(socket)
+     |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)}
   end
 
   def handle_event("open_create_room", _, socket) do
@@ -109,7 +114,8 @@ defmodule QaAppWeb.AdminLive.Index do
     {:noreply,
      socket
      |> assign(:show_create_moderator_modal?, false)
-     |> assign(:confirm_deactivate_id, nil)}
+     |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)}
   end
 
   def handle_event("create_room", %{"room" => room_params}, socket) do
@@ -179,6 +185,7 @@ defmodule QaAppWeb.AdminLive.Index do
          |> assign(:moderators, moderators)
          |> assign(:show_create_moderator_modal?, false)
          |> assign(:confirm_deactivate_id, nil)
+         |> assign(:confirm_deactivate_room, nil)
          |> put_flash(:info, "Moderator account created successfully.")}
 
       {:error, _} ->
@@ -199,7 +206,12 @@ defmodule QaAppWeb.AdminLive.Index do
     # an admin can't accidentally hide questions from visitors.
     if room.is_active do
       Process.send_after(self(), :reset_room_confirm, @deactivate_confirm_timeout)
-      {:noreply, socket |> assign(:confirm_deactivate_id, room.id) |> stream_rooms()}
+
+      {:noreply,
+       socket
+       |> assign(:confirm_deactivate_id, room.id)
+       |> assign(:confirm_deactivate_room, room)
+       |> stream_rooms()}
     else
       case update_room_status(socket, room, true) do
         {:ok, socket} -> {:noreply, stream_rooms(socket)}
@@ -220,7 +232,9 @@ defmodule QaAppWeb.AdminLive.Index do
   def handle_event("cancel_room_inactive", %{"id" => id}, socket) do
     socket =
       if socket.assigns[:confirm_deactivate_id] == id do
-        assign(socket, :confirm_deactivate_id, nil)
+        socket
+        |> assign(:confirm_deactivate_id, nil)
+        |> assign(:confirm_deactivate_room, nil)
       else
         socket
       end
@@ -228,10 +242,22 @@ defmodule QaAppWeb.AdminLive.Index do
     {:noreply, stream_rooms(socket)}
   end
 
+  # Closes the centered deactivate-confirmation modal, e.g. from its close
+  # button or outside clicks; the panel's own controls use `cancel_room_inactive`.
+  def handle_event("close_deactivate_confirm", _, socket) do
+    {:noreply,
+     socket
+     |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)}
+  end
+
   defp update_room_status(socket, room, is_active) do
     case Events.update_room(room, %{"is_active" => is_active}) do
       {:ok, _updated_room} ->
-        {:ok, assign(socket, :confirm_deactivate_id, nil)}
+        {:ok,
+         socket
+         |> assign(:confirm_deactivate_id, nil)
+         |> assign(:confirm_deactivate_room, nil)}
 
       {:error, changeset} ->
         errors = Enum.map_join(changeset.errors, ", ", fn {key, {msg, _}} -> "#{key} #{msg}" end)
@@ -239,6 +265,7 @@ defmodule QaAppWeb.AdminLive.Index do
         {:error,
          socket
          |> assign(:confirm_deactivate_id, nil)
+         |> assign(:confirm_deactivate_room, nil)
          |> put_flash(:error, "Failed to update room status: #{errors}")}
     end
   end
@@ -369,11 +396,6 @@ defmodule QaAppWeb.AdminLive.Index do
                         <% end %>
                       </span>
                     </div>
-                    <%= if @confirm_deactivate_id == room.id do %>
-                      <div class="mt-2 min-w-[260px]">
-                        <.deactivate_confirm room={room} id_prefix={"row-#{room.id}"} />
-                      </div>
-                    <% end %>
                   </td>
                   <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
                     <.local_datetime id={"room-expiry-#{room.id}"} datetime={room.expires_at} />
@@ -408,6 +430,15 @@ defmodule QaAppWeb.AdminLive.Index do
             </table>
           </div>
         </section>
+
+        <!-- Deactivate Room Confirmation Modal -->
+        <%= if @confirm_deactivate_room do %>
+          <.modal close_event="close_deactivate_confirm">
+            <div id="deactivate-confirm-modal">
+              <.deactivate_confirm room={@confirm_deactivate_room} variant="modal" />
+            </div>
+          </.modal>
+        <% end %>
 
         <!-- Configure Room Modal -->
         <%= if @show_configure_room_modal? do %>
