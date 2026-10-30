@@ -554,6 +554,48 @@ defmodule QaAppWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Renders the "Room is not open" banner with a one-click `Open room` action.
+
+  Shown to moderators on the questions and settings pages while a room is
+  inactive so they can see the room is closed and open it right away. The
+  button posts the `toggle_room_active` event with the room's id.
+
+  ## Examples
+
+      <.room_not_open_banner room={@room} />
+  """
+  attr :room, :map, required: true
+
+  def room_not_open_banner(assigns) do
+    ~H"""
+    <div
+      id="room-not-open-banner"
+      class="mb-10 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 rounded border border-line-strong px-4 py-3"
+    >
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="w-2 h-2 rounded-full bg-ink/50 shrink-0"></span>
+        <div class="min-w-0">
+          <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2">
+            Room is not open
+          </p>
+          <p class="mt-0.5 text-[13px] text-ink-3">
+            Visitors see a waiting page and can't submit questions until you open the room.
+          </p>
+        </div>
+      </div>
+      <button
+        id="open-room-button"
+        phx-click="toggle_room_active"
+        phx-value-id={@room.id}
+        class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150 shrink-0"
+      >
+        <.icon name="hero-play" class="size-3.5" /> Open room
+      </button>
+    </div>
+    """
+  end
+
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""

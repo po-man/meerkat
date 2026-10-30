@@ -403,20 +403,19 @@ defmodule QaAppWeb.ModeratorLiveTest do
       view
     end
 
-    test "shows the open status pill and a guarded close trigger when active", %{
+    test "does not show the not-open banner when the room is active", %{
       conn: conn,
       owner: owner,
       room: room
     } do
       view = open_questions(conn, owner, room.slug)
 
-      assert view |> element("#moderator-room-status") |> render() =~ "Open"
-      assert has_element?(view, "#close-room-trigger")
       refute has_element?(view, "#room-not-open-banner")
-      refute has_element?(view, "#questions-confirm")
+      refute has_element?(view, "#open-room-button")
+      assert view |> element("#moderator-visitor-count") |> render() =~ "live"
     end
 
-    test "shows the not-open banner and opens the room with one click", %{
+    test "shows the not-open banner for an inactive room and opens it with one click", %{
       conn: conn,
       owner: owner,
       room: room
@@ -427,87 +426,30 @@ defmodule QaAppWeb.ModeratorLiveTest do
 
       view = open_questions(conn, owner, room.slug)
 
-      assert view |> element("#moderator-room-status") |> render() =~ "Not open"
       assert has_element?(view, "#room-not-open-banner")
-      refute has_element?(view, "#close-room-trigger")
+      assert has_element?(view, "#open-room-button")
+      assert view |> element("#moderator-visitor-count") |> render() =~ "waiting"
 
       view |> element("#open-room-button") |> render_click()
 
       assert Events.get_room!(room.id).is_active == true
-
-      assert_eventually(fn -> has_element?(view, "#close-room-trigger") end)
       refute has_element?(view, "#room-not-open-banner")
+      assert view |> element("#moderator-visitor-count") |> render() =~ "live"
     end
 
-    test "requires confirmation before closing the room", %{
+    test "live shows the not-open banner when the room is deactivated elsewhere", %{
       conn: conn,
       owner: owner,
       room: room
     } do
       view = open_questions(conn, owner, room.slug)
 
-      # First click arms the confirmation; the room stays open.
-      view |> element("#close-room-trigger") |> render_click()
-      assert Events.get_room!(room.id).is_active == true
-      assert has_element?(view, "#questions-confirm")
-
-      # Cancelling keeps the room open.
-      view
-      |> element(~s(#questions-confirm button[phx-click="cancel_room_inactive"]))
-      |> render_click()
-
-      assert has_element?(view, "#close-room-trigger")
-      refute has_element?(view, "#questions-confirm")
-      assert Events.get_room!(room.id).is_active == true
-
-      # Arming again and confirming closes the room.
-      view |> element("#close-room-trigger") |> render_click()
-      assert has_element?(view, "#questions-confirm")
-
-      view
-      |> element(~s(#questions-confirm button[phx-click="confirm_room_inactive"]))
-      |> render_click()
-
-      refute Events.get_room!(room.id).is_active
-
-      assert_eventually(fn -> has_element?(view, "#room-not-open-banner") end)
-      assert has_element?(view, "#open-room-button")
-    end
-
-    test "auto-cancels the armed close confirmation", %{
-      conn: conn,
-      owner: owner,
-      room: room
-    } do
-      view = open_questions(conn, owner, room.slug)
-
-      view |> element("#close-room-trigger") |> render_click()
-      assert has_element?(view, "#questions-confirm")
-
-      send(view.pid, :reset_room_confirm)
-      render(view)
-
-      refute has_element?(view, "#questions-confirm")
-      assert has_element?(view, "#close-room-trigger")
-      assert Events.get_room!(room.id).is_active == true
-    end
-
-    test "live updates the status when the room changes elsewhere", %{
-      conn: conn,
-      owner: owner,
-      room: room
-    } do
-      view = open_questions(conn, owner, room.slug)
-
-      assert view |> element("#moderator-room-status") |> render() =~ "Open"
+      refute has_element?(view, "#room-not-open-banner")
 
       {:ok, _} = Events.update_room(room, %{"is_active" => "false"})
 
-      assert_eventually(fn ->
-        view |> element("#moderator-room-status") |> render() =~ "Not open"
-      end)
-
       assert_eventually(fn -> has_element?(view, "#room-not-open-banner") end)
+      assert view |> element("#moderator-visitor-count") |> render() =~ "waiting"
     end
   end
 end

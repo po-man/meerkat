@@ -31,6 +31,27 @@ defmodule QaAppWeb.ModeratorLive.Settings do
     end
   end
 
+  # The not-open banner's one-click action: opens an inactive room directly
+  # from the settings page.
+  def handle_event("toggle_room_active", %{"id" => id}, socket) do
+    room = socket.assigns.room
+
+    if room.id == id && !room.is_active do
+      case Events.update_room(room, %{"is_active" => true}) do
+        {:ok, updated_room} ->
+          {:noreply,
+           socket
+           |> assign(:room, updated_room)
+           |> assign(:settings_form, settings_form(updated_room))}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to open the room.")}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_info({:room_settings_updated, room}, socket) do
     {:noreply,
      socket
@@ -59,6 +80,10 @@ defmodule QaAppWeb.ModeratorLive.Settings do
     ~H"""
     <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
       <div class="max-w-6xl mx-auto px-6 pt-12 sm:pt-16 pb-24">
+        <%= if !@room.is_active do %>
+          <.room_not_open_banner room={@room} />
+        <% end %>
+
         <!-- Masthead -->
         <header class="border-b border-line pb-8">
           <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">

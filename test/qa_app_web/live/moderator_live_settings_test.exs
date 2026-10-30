@@ -54,6 +54,39 @@ defmodule QaAppWeb.ModeratorLiveSettingsTest do
       assert has_element?(view, "#room-expiry-local")
       assert render(view) =~ ~s(data-format="datetime")
       assert render(view) =~ ~s(phx-hook="LocalDateTime")
+
+      # An active room shows no not-open banner on the settings page.
+      refute has_element?(view, "#room-not-open-banner")
+    end
+
+    test "shows the not-open banner for an inactive room and opens it with one click", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      room
+      |> Ecto.Changeset.change(is_active: false)
+      |> QaApp.Repo.update!()
+
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}/settings")
+
+      assert has_element?(view, "#room-not-open-banner")
+      assert has_element?(view, "#open-room-button")
+
+      view |> element("#open-room-button") |> render_click()
+
+      assert Events.get_room!(room.id).is_active == true
+
+      # The banner clears and the "Room is open" toggle reflects the new state.
+      refute has_element?(view, "#room-not-open-banner")
+
+      toggle_html =
+        view
+        |> element(~s(#settings-form input[type=checkbox][name="room[is_active]"]))
+        |> render()
+
+      assert toggle_html =~ "checked"
     end
 
     test "updates the room settings on submit", %{conn: conn, owner: owner, room: room} do
