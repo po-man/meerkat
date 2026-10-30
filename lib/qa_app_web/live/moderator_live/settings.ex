@@ -129,7 +129,7 @@ defmodule QaAppWeb.ModeratorLive.Settings do
                 target="_blank"
                 class="inline-flex items-center gap-2 h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
               >
-                <.icon name="hero-arrow-down-tray" class="size-4" /> Export CSV
+                <.icon name="hero-arrow-down-tray" class="size-4" /> Export
               </.link>
             </div>
           </div>
