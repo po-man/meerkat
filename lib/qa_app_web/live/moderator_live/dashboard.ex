@@ -183,9 +183,9 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
                 if(room.is_active, do: "text-ink-2", else: "text-ink-3")
               ]}>
                 <%= if room.is_active do %>
-                  Active
+                  Open
                 <% else %>
-                  Inactive
+                  Closed
                 <% end %>
               </span>
             </div>

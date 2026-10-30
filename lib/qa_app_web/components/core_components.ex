@@ -514,7 +514,7 @@ defmodule QaAppWeb.CoreComponents do
           <span class="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-danger"></span>
           <div class="min-w-0">
             <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-danger">
-              Turn off this room?
+              Close this room?
             </p>
             <h3 class="mt-1.5 text-xl font-semibold tracking-[-0.02em] text-ink">
               {@room.title}
@@ -544,7 +544,7 @@ defmodule QaAppWeb.CoreComponents do
             phx-value-id={@room.id}
             class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded bg-danger text-paper text-sm font-medium hover:bg-ink transition-colors duration-150"
           >
-            <.icon name="hero-lock-closed" class="size-4" /> Turn off room
+            <.icon name="hero-lock-closed" class="size-4" /> Close room
           </button>
         </div>
       </div>
@@ -563,7 +563,7 @@ defmodule QaAppWeb.CoreComponents do
                 :if={@variant == "strip"}
                 class="font-mono text-[11px] uppercase tracking-[0.14em] text-danger"
               >
-                Turn off this room?
+                Close this room?
               </p>
               <p class={[
                 "text-ink-2 leading-relaxed",
@@ -585,7 +585,7 @@ defmodule QaAppWeb.CoreComponents do
               phx-value-id={@room.id}
               class="inline-flex items-center gap-1.5 h-8 px-3 rounded border border-danger/60 bg-transparent text-danger text-xs font-medium hover:bg-danger/10 transition-colors duration-150"
             >
-              <.icon name="hero-lock-closed" class="size-3.5" /> Turn off room
+              <.icon name="hero-lock-closed" class="size-3.5" /> Close room
             </button>
             <button
               type="button"

@@ -389,11 +389,6 @@ defmodule QaAppWeb.AdminLive.Index do
                         "font-mono text-[11px] uppercase tracking-[0.14em]",
                         if(room.is_active, do: "text-ink-2", else: "text-ink-3")
                       ]}>
-                        <%= if room.is_active do %>
-                          Active
-                        <% else %>
-                          Inactive
-                        <% end %>
                       </span>
                     </div>
                   </td>
