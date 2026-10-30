@@ -337,10 +337,10 @@ defmodule QaAppWeb.AdminLive.Index do
               <thead>
                 <tr>
                   <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
-                    Title / Slug
+                    Room
                   </th>
                   <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
-                    Assigned Moderator
+                    Moderator
                   </th>
                   <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
                     Character Limit
@@ -513,10 +513,11 @@ defmodule QaAppWeb.AdminLive.Index do
                 field={@edit_room_form[:max_visitors]}
                 type="number"
                 min="1"
+                placeholder="Leave empty for unlimited"
                 label="Max Concurrent Visitors"
               />
               <p class="mt-1 text-xs leading-relaxed text-ink-3">
-                Leave empty for unlimited. Existing visitors are removed
+                Existing visitors are removed
                 (newest first) if you lower this below the current count.
               </p>
 
@@ -529,7 +530,7 @@ defmodule QaAppWeb.AdminLive.Index do
               <.input
                 field={@edit_room_form[:intro_text]}
                 type="textarea"
-                label="Intro / Description Text"
+                label="Intro"
               />
 
               <div class="flex items-center justify-end gap-3 pt-2">
