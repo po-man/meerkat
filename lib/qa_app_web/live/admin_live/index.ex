@@ -6,6 +6,10 @@ defmodule QaAppWeb.AdminLive.Index do
   alias QaApp.Accounts
   alias QaApp.RoomCapacity
 
+  # How long an armed "deactivate room" confirmation stays open before it
+  # auto-cancels, protecting against an accidental close.
+  @deactivate_confirm_timeout 6_000
+
   def mount(_params, _session, socket) do
     users = Accounts.list_users()
     moderators = Accounts.list_moderators()
@@ -26,6 +30,8 @@ defmodule QaAppWeb.AdminLive.Index do
      |> assign(:edit_room_form, nil)
      |> assign(:show_create_room_modal?, false)
      |> assign(:show_create_moderator_modal?, false)
+     |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)
      |> assign(:show_configure_room_modal?, false)
      |> assign(:moderator_form, to_form(%{"username" => "", "password" => ""}, as: :moderator))}
   end
@@ -52,6 +58,26 @@ defmodule QaAppWeb.AdminLive.Index do
   # list and are otherwise irrelevant here.
   def handle_info({:room_settings_updated, _room}, socket), do: {:noreply, socket}
   def handle_info({:room_visitors_expelled, _session_ids}, socket), do: {:noreply, socket}
+
+  # A room's settings changed from another view (moderator dashboard, settings
+  # tab, or a status toggle). Refresh the streamed rows so the status toggle
+  # and labels stay live, and clear any armed deactivation confirmation.
+  def handle_info({:rooms_settings_updated, _room}, socket) do
+    {:noreply,
+     socket
+     |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)
+     |> stream_rooms()}
+  end
+
+  # The armed "deactivate room" confirmation timed out; cancel it so an
+  # accidental close can't happen after the moderator walked away.
+  def handle_info(:reset_room_confirm, socket) do
+    {:noreply,
+     stream_rooms(socket)
+     |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)}
+  end
 
   def handle_event("open_create_room", _, socket) do
     {:noreply, assign(socket, :show_create_room_modal?, true)}
@@ -85,14 +111,22 @@ defmodule QaAppWeb.AdminLive.Index do
   end
 
   def handle_event("close_create_moderator", _, socket) do
-    {:noreply, assign(socket, :show_create_moderator_modal?, false)}
+    {:noreply,
+     socket
+     |> assign(:show_create_moderator_modal?, false)
+     |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)}
   end
 
   def handle_event("create_room", %{"room" => room_params}, socket) do
     room_params =
-      if room_params["moderator_id"] == "",
-        do: Map.delete(room_params, "moderator_id"),
-        else: room_params
+      room_params
+      |> normalize_is_active()
+      |> then(fn params ->
+        if params["moderator_id"] == "",
+          do: Map.delete(params, "moderator_id"),
+          else: params
+      end)
 
     case Events.create_room(room_params) do
       {:ok, _room} ->
@@ -112,9 +146,13 @@ defmodule QaAppWeb.AdminLive.Index do
     room = socket.assigns.editing_room
 
     room_params =
-      if room_params["moderator_id"] == "",
-        do: Map.put(room_params, "moderator_id", nil),
-        else: room_params
+      room_params
+      |> normalize_is_active()
+      |> then(fn params ->
+        if params["moderator_id"] == "",
+          do: Map.put(params, "moderator_id", nil),
+          else: params
+      end)
 
     case Events.update_room(room, room_params) do
       {:ok, _updated_room} ->
@@ -146,6 +184,8 @@ defmodule QaAppWeb.AdminLive.Index do
          |> assign(:users, users)
          |> assign(:moderators, moderators)
          |> assign(:show_create_moderator_modal?, false)
+         |> assign(:confirm_deactivate_id, nil)
+         |> assign(:confirm_deactivate_room, nil)
          |> put_flash(:info, "Moderator account created successfully.")}
 
       {:error, _} ->
@@ -157,6 +197,77 @@ defmodule QaAppWeb.AdminLive.Index do
     room = Events.get_room!(id)
     {:ok, _} = Events.delete_room(room)
     {:noreply, stream_rooms(socket)}
+  end
+
+  def handle_event("toggle_room_active", %{"id" => id}, socket) do
+    room = Events.get_room!(id)
+
+    # Opening a room is a single click; deactivating arms a confirmation so
+    # an admin can't accidentally hide questions from visitors.
+    if room.is_active do
+      Process.send_after(self(), :reset_room_confirm, @deactivate_confirm_timeout)
+
+      {:noreply,
+       socket
+       |> assign(:confirm_deactivate_id, room.id)
+       |> assign(:confirm_deactivate_room, room)
+       |> stream_rooms()}
+    else
+      case update_room_status(socket, room, true) do
+        {:ok, socket} -> {:noreply, stream_rooms(socket)}
+        {:error, socket} -> {:noreply, socket}
+      end
+    end
+  end
+
+  def handle_event("confirm_room_inactive", %{"id" => id}, socket) do
+    room = Events.get_room!(id)
+
+    case update_room_status(socket, room, false) do
+      {:ok, socket} -> {:noreply, stream_rooms(socket)}
+      {:error, socket} -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_room_inactive", %{"id" => id}, socket) do
+    socket =
+      if socket.assigns[:confirm_deactivate_id] == id do
+        socket
+        |> assign(:confirm_deactivate_id, nil)
+        |> assign(:confirm_deactivate_room, nil)
+      else
+        socket
+      end
+
+    {:noreply, stream_rooms(socket)}
+  end
+
+  # Closes the centered deactivate-confirmation modal, e.g. from its close
+  # button or outside clicks; the panel's own controls use `cancel_room_inactive`.
+  def handle_event("close_deactivate_confirm", _, socket) do
+    {:noreply,
+     socket
+     |> assign(:confirm_deactivate_id, nil)
+     |> assign(:confirm_deactivate_room, nil)}
+  end
+
+  defp update_room_status(socket, room, is_active) do
+    case Events.update_room(room, %{"is_active" => is_active}) do
+      {:ok, _updated_room} ->
+        {:ok,
+         socket
+         |> assign(:confirm_deactivate_id, nil)
+         |> assign(:confirm_deactivate_room, nil)}
+
+      {:error, changeset} ->
+        errors = Enum.map_join(changeset.errors, ", ", fn {key, {msg, _}} -> "#{key} #{msg}" end)
+
+        {:error,
+         socket
+         |> assign(:confirm_deactivate_id, nil)
+         |> assign(:confirm_deactivate_room, nil)
+         |> put_flash(:error, "Failed to update room status: #{errors}")}
+    end
   end
 
   def render(assigns) do
@@ -229,6 +340,9 @@ defmodule QaAppWeb.AdminLive.Index do
                     Live Visitors
                   </th>
                   <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
+                    Status
+                  </th>
+                  <th class="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink-3 border-b border-line-strong whitespace-nowrap">
                     Expires
                   </th>
                   <th class="py-3 border-b border-line-strong text-right">
@@ -268,6 +382,16 @@ defmodule QaAppWeb.AdminLive.Index do
                       <% end %>
                     </span>
                   </td>
+                  <td class="py-4 pr-4 align-top">
+                    <div class="flex items-center gap-3">
+                      <.status_toggle room={room} />
+                      <span class={[
+                        "font-mono text-[11px] uppercase tracking-[0.14em]",
+                        if(room.is_active, do: "text-ink-2", else: "text-ink-3")
+                      ]}>
+                      </span>
+                    </div>
+                  </td>
                   <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
                     <.local_datetime id={"room-expiry-#{room.id}"} datetime={room.expires_at} />
                   </td>
@@ -301,6 +425,15 @@ defmodule QaAppWeb.AdminLive.Index do
             </table>
           </div>
         </section>
+
+        <!-- Deactivate Room Confirmation Modal -->
+        <%= if @confirm_deactivate_room do %>
+          <.modal close_event="close_deactivate_confirm">
+            <div id="deactivate-confirm-modal">
+              <.deactivate_confirm room={@confirm_deactivate_room} variant="modal" />
+            </div>
+          </.modal>
+        <% end %>
 
         <!-- Configure Room Modal -->
         <%= if @show_configure_room_modal? do %>
@@ -370,6 +503,12 @@ defmodule QaAppWeb.AdminLive.Index do
                 Leave empty for unlimited. Existing visitors are removed
                 (newest first) if you lower this below the current count.
               </p>
+
+              <.toggle
+                field={@edit_room_form[:is_active]}
+                label="Room is open"
+                hint="Visitors can join and submit questions while the room is active."
+              />
 
               <.input
                 field={@edit_room_form[:intro_text]}
@@ -467,6 +606,12 @@ defmodule QaAppWeb.AdminLive.Index do
                 label="Room Expiry (auto-cleanup)"
               />
 
+              <.toggle
+                field={@room_form[:is_active]}
+                label="Room is open"
+                hint="Visitors can join and submit questions while the room is active."
+              />
+
               <div class="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -539,6 +684,21 @@ defmodule QaAppWeb.AdminLive.Index do
       </div>
     </QaAppWeb.Layouts.app>
     """
+  end
+
+  # The toggle renders a hidden `false` plus a visible checkbox for the same
+  # field, so LiveView may deliver `is_active` as a plain string or (when
+  # checked) as the list ["false", "true"]. Coerce it to a single value the
+  # changeset can cast.
+  defp normalize_is_active(params) do
+    case Map.get(params, "is_active") do
+      nil -> params
+      ["false", "true"] -> Map.put(params, "is_active", "true")
+      ["true"] -> Map.put(params, "is_active", "true")
+      value when value in [true, "true"] -> Map.put(params, "is_active", "true")
+      value when value in [false, "false"] -> Map.put(params, "is_active", "false")
+      _other -> Map.put(params, "is_active", "false")
+    end
   end
 
   defp stream_rooms(socket) do

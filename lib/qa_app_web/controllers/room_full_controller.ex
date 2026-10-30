@@ -19,15 +19,15 @@ defmodule QaAppWeb.RoomFullController do
 
   def show(conn, %{"slug" => slug}) do
     case Events.get_room_by_slug(slug) do
-      %{is_active: true} = room ->
-        conn
-        |> put_resp_header("refresh", "#{@retry_seconds}; url=#{retry_path(slug)}")
-        |> render(:show, room: room)
-
-      _ ->
+      nil ->
         conn
         |> put_flash(:error, "Event room not found")
         |> redirect(to: "/")
+
+      room ->
+        conn
+        |> put_resp_header("refresh", "#{@retry_seconds}; url=#{retry_path(slug)}")
+        |> render(:show, room: room)
     end
   end
 

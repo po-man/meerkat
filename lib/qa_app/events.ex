@@ -127,6 +127,11 @@ defmodule QaApp.Events do
 
   def broadcast_room_updated(%Room{} = room) do
     Phoenix.PubSub.broadcast(QaApp.PubSub, "room:#{room.id}", {:room_settings_updated, room})
+
+    # Also announce on the global rooms topic so open room listings (admin
+    # control center and moderator dashboard) refresh their rows live when the
+    # settings change from another view (e.g. a status toggle).
+    Phoenix.PubSub.broadcast(QaApp.PubSub, "rooms", {:rooms_settings_updated, room})
   end
 
   defp broadcast_room_expired(%Room{} = room) do

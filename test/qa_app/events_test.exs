@@ -51,6 +51,29 @@ defmodule QaApp.EventsTest do
 
       assert "must be selected" in errors_on(changeset).expires_in
     end
+
+    test "defaults to active when not provided" do
+      assert {:ok, room} =
+               Events.create_room(%{
+                 "slug" => "active-default",
+                 "title" => "Active Default",
+                 "expires_in" => "1 hour"
+               })
+
+      assert room.is_active == true
+    end
+
+    test "accepts an explicit inactive status" do
+      assert {:ok, room} =
+               Events.create_room(%{
+                 "slug" => "inactive-create",
+                 "title" => "Inactive Create",
+                 "is_active" => "false",
+                 "expires_in" => "1 hour"
+               })
+
+      assert room.is_active == false
+    end
   end
 
   describe "update_room/2" do

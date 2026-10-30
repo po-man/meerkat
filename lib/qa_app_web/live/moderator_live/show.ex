@@ -2,6 +2,7 @@ defmodule QaAppWeb.ModeratorLive.Show do
   use QaAppWeb, :live_view
 
   alias QaApp.Engagement
+  alias QaApp.Events
   alias QaApp.RoomCapacity
   alias QaAppWeb.ModeratorLive.RoomAuth
 
@@ -40,6 +41,25 @@ defmodule QaAppWeb.ModeratorLive.Show do
     {:noreply, assign(socket, :show_qr_modal?, not socket.assigns.show_qr_modal?)}
   end
 
+  # Opens the room from the not-open banner. The banner only shows while the
+  # room is inactive, so this is a single, immediate action with no
+  # confirmation.
+  def handle_event("toggle_room_active", %{"id" => id}, socket) do
+    room = socket.assigns.room
+
+    if room.id == id && !room.is_active do
+      case Events.update_room(room, %{"is_active" => true}) do
+        {:ok, updated_room} ->
+          {:noreply, assign(socket, :room, updated_room)}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to open the room.")}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_info({tag, _question}, socket) when tag in [:question_created, :question_updated] do
     {:noreply, load_questions(socket)}
   end
@@ -62,9 +82,13 @@ defmodule QaAppWeb.ModeratorLive.Show do
     ~H"""
     <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
       <div class="max-w-6xl mx-auto px-6 pt-12 sm:pt-16 pb-24">
+        <%= if !@room.is_active do %>
+          <.room_not_open_banner room={@room} />
+        <% end %>
+
         <!-- Masthead -->
         <header class="border-b border-line pb-8">
-          <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+          <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
               <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
                 <span class="w-2 h-2 bg-accent"></span>
@@ -79,11 +103,15 @@ defmodule QaAppWeb.ModeratorLive.Show do
             <div class="flex items-center gap-3">
               <span
                 id="moderator-visitor-count"
-                class="hidden sm:inline-flex items-center gap-1.5 h-10 px-3 rounded border border-line-strong bg-transparent font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums"
+                class="inline-flex items-center gap-1.5 h-10 px-3 rounded border border-line-strong bg-transparent font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums"
               >
                 <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
                 {@visitor_count}
-                <span class="normal-case">live</span>
+                <%= if @room.is_active do %>
+                  live
+                <% else %>
+                  waiting
+                <% end %>
                 <%= if @room.max_visitors do %>
                   <span class="text-ink-3">/ {@room.max_visitors}</span>
                 <% end %>
@@ -93,7 +121,7 @@ defmodule QaAppWeb.ModeratorLive.Show do
                 phx-click="toggle_qr_modal"
                 class="inline-flex items-center gap-2 h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
               >
-                <.icon name="hero-qr-code" class="size-4" /> Share QR Code
+                <.icon name="hero-qr-code" class="size-4" /> Invite
               </button>
             </div>
           </div>

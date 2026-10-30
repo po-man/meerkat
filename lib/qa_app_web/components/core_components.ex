@@ -354,6 +354,296 @@ defmodule QaAppWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Renders a switch-style toggle bound to a boolean form field, such as a
+  room's `is_active` status.
+
+  Unlike `input/1`, the control is a sliding switch that matches the app's
+  design language while keeping the standard hidden-false / visible-checkbox
+  semantics so the value round-trips through the form.
+
+  ## Examples
+
+      <.toggle field={@form[:is_active]} label="Room is open" hint="Visitors can join while this is on." />
+      <.toggle name="room[is_active]" value={@active} label="Room is open" />
+  """
+  attr :id, :any, default: nil
+  attr :name, :any
+  attr :label, :string, default: nil
+  attr :hint, :string, default: nil
+  attr :value, :any
+
+  attr :field, Phoenix.HTML.FormField,
+    doc: "a form field struct retrieved from the form, for example: @form[:is_active]"
+
+  attr :errors, :list, default: []
+  attr :checked, :boolean, doc: "the checked flag for the toggle"
+  attr :rest, :global, include: ~w(disabled form)
+
+  def toggle(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
+    errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
+
+    assigns
+    |> assign(field: nil, id: assigns[:id] || field.id)
+    |> assign(:errors, Enum.map(errors, &translate_error(&1)))
+    |> assign_new(:name, fn -> field.name end)
+    |> assign_new(:checked, fn -> Phoenix.HTML.Form.normalize_value("checkbox", field.value) end)
+    |> toggle()
+  end
+
+  def toggle(assigns) do
+    assigns =
+      assign_new(assigns, :checked, fn ->
+        Phoenix.HTML.Form.normalize_value("checkbox", assigns[:value])
+      end)
+
+    ~H"""
+    <div>
+      <div class="flex items-center justify-between gap-6">
+        <div class="min-w-0">
+          <p :if={@label} class="text-sm font-medium text-ink">{@label}</p>
+          <p :if={@hint} class="mt-1 text-xs leading-relaxed text-ink-3">{@hint}</p>
+        </div>
+        <label class="relative h-5 w-9 shrink-0 cursor-pointer">
+          <input
+            type="hidden"
+            name={@name}
+            value="false"
+            disabled={@rest[:disabled]}
+            form={@rest[:form]}
+          />
+          <input
+            type="checkbox"
+            id={@id}
+            name={@name}
+            value="true"
+            checked={@checked}
+            class="peer sr-only"
+            disabled={@rest[:disabled]}
+            form={@rest[:form]}
+          />
+          <div class="absolute inset-0 rounded-full border border-line-strong bg-surface transition-colors duration-150 peer-checked:border-accent peer-checked:bg-accent">
+          </div>
+          <span class="absolute top-1/2 left-0.5 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-paper border border-line-strong transition-transform duration-150 peer-checked:translate-x-[16px] peer-checked:border-transparent"></span>
+        </label>
+      </div>
+      <.error :for={msg <- @errors}>{msg}</.error>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders a compact switch that flips a room's active/inactive status
+  directly from a list row.
+
+  The switch posts the `toggle_room_active` event with the room's id, which
+  the admin and moderator listings handle server-side.
+
+  ## Examples
+
+      <.status_toggle room={room} />
+  """
+  attr :room, :map, required: true
+
+  def status_toggle(assigns) do
+    ~H"""
+    <button
+      type="button"
+      role="switch"
+      id={"room-active-toggle-#{@room.id}"}
+      aria-checked={to_string(@room.is_active)}
+      aria-label={"Toggle #{@room.title} active state"}
+      title={if(@room.is_active, do: "Deactivate room", else: "Activate room")}
+      phx-click="toggle_room_active"
+      phx-value-id={@room.id}
+      class={[
+        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-150",
+        if(@room.is_active,
+          do: "bg-accent border-accent",
+          else: "bg-surface border-line-strong hover:border-ink"
+        )
+      ]}
+    >
+      <span class={[
+        "inline-block h-3.5 w-3.5 rounded-full border transition-transform duration-150",
+        if(@room.is_active,
+          do: "translate-x-[16px] bg-paper border-accent",
+          else: "translate-x-[2px] bg-paper border-line-strong"
+        )
+      ]}></span>
+    </button>
+    """
+  end
+
+  @doc """
+  Renders the two-step confirmation shown before a room is deactivated.
+
+  It warns that visitors will be put on the waiting page and can't see
+  questions until the room is open again, and is used consistently by the
+  admin and moderator listings (`variant="inline"` and `variant="modal"`)
+  and the moderator questions page (`variant="strip"`) so the wording and
+  controls stay the same everywhere. The buttons fire the shared
+  `confirm_room_inactive` and `cancel_room_inactive` events with the room's
+  id.
+
+  The `modal` variant drops the boxed styling and lays the copy and actions
+  out for the centered `<.modal>` panel, so the confirmation pop-up does not
+  distort the listing rows it came from.
+
+  ## Examples
+
+      <.deactivate_confirm room={room} id_prefix={"row-\#{room.id}"} />
+      <.deactivate_confirm room={room} variant="modal" />
+      <.deactivate_confirm room={room} variant="strip">
+        Custom copy for this surface.
+      </.deactivate_confirm>
+  """
+  attr :room, :map, required: true
+  attr :id_prefix, :string, default: "room-deactivate"
+  attr :variant, :string, values: ["inline", "strip", "modal"], default: "inline"
+  attr :confirm_event, :string, default: "confirm_room_inactive"
+  attr :cancel_event, :string, default: "cancel_room_inactive"
+
+  slot :inner_block
+
+  def deactivate_confirm(assigns) do
+    ~H"""
+    <%= if @variant == "modal" do %>
+      <div id={"#{@id_prefix}-confirm"}>
+        <div class="flex items-start gap-3 min-w-0">
+          <span class="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-danger"></span>
+          <div class="min-w-0">
+            <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-danger">
+              Close this room?
+            </p>
+            <h3 class="mt-1.5 text-xl font-semibold tracking-[-0.02em] text-ink">
+              {@room.title}
+            </h3>
+            <p class="mt-2 text-[13px] leading-relaxed text-ink-2">
+              <%= case render_slot(@inner_block) do %>
+                <% [] -> %>
+                  Visitors will see the waiting page and can't see questions until the room is open again.
+                <% content -> %>
+                  {content}
+              <% end %>
+            </p>
+          </div>
+        </div>
+        <div class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4 border-t border-line">
+          <button
+            type="button"
+            phx-click={@cancel_event}
+            phx-value-id={@room.id}
+            class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            phx-click={@confirm_event}
+            phx-value-id={@room.id}
+            class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded bg-danger text-paper text-sm font-medium hover:bg-ink transition-colors duration-150"
+          >
+            <.icon name="hero-lock-closed" class="size-4" /> Close room
+          </button>
+        </div>
+      </div>
+    <% else %>
+      <div id={"#{@id_prefix}-confirm"} class="rounded border border-danger/40 bg-surface">
+        <div class={[
+          if(@variant == "strip",
+            do: "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3",
+            else: "flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2"
+          )
+        ]}>
+          <div class="flex items-start gap-2.5 min-w-0">
+            <span class="mt-0.5 shrink-0 w-1.5 h-1.5 rounded-full bg-danger"></span>
+            <div class="min-w-0">
+              <p
+                :if={@variant == "strip"}
+                class="font-mono text-[11px] uppercase tracking-[0.14em] text-danger"
+              >
+                Close this room?
+              </p>
+              <p class={[
+                "text-ink-2 leading-relaxed",
+                if(@variant == "strip", do: "mt-1 text-[13px]", else: "text-xs")
+              ]}>
+                <%= case render_slot(@inner_block) do %>
+                  <% [] -> %>
+                    Visitors will see the waiting page and can't see questions until the room is open again.
+                  <% content -> %>
+                    {content}
+                <% end %>
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              phx-click={@confirm_event}
+              phx-value-id={@room.id}
+              class="inline-flex items-center gap-1.5 h-8 px-3 rounded border border-danger/60 bg-transparent text-danger text-xs font-medium hover:bg-danger/10 transition-colors duration-150"
+            >
+              <.icon name="hero-lock-closed" class="size-3.5" /> Close room
+            </button>
+            <button
+              type="button"
+              phx-click={@cancel_event}
+              phx-value-id={@room.id}
+              class="inline-flex items-center h-8 px-3 rounded border border-line-strong bg-transparent text-ink-2 text-xs font-medium hover:border-ink hover:text-ink transition-colors duration-150"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    <% end %>
+    """
+  end
+
+  @doc """
+  Renders the "Room is not open" banner with a one-click `Open room` action.
+
+  Shown to moderators on the questions and settings pages while a room is
+  inactive so they can see the room is closed and open it right away. The
+  button posts the `toggle_room_active` event with the room's id.
+
+  ## Examples
+
+      <.room_not_open_banner room={@room} />
+  """
+  attr :room, :map, required: true
+
+  def room_not_open_banner(assigns) do
+    ~H"""
+    <div
+      id="room-not-open-banner"
+      class="mb-10 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 rounded border border-line-strong px-4 py-3"
+    >
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="w-2 h-2 rounded-full bg-ink/50 shrink-0"></span>
+        <div class="min-w-0">
+          <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2">
+            Room is not open
+          </p>
+          <p class="mt-0.5 text-[13px] text-ink-3">
+            Visitors see a waiting page and can't submit questions until you open the room.
+          </p>
+        </div>
+      </div>
+      <button
+        id="open-room-button"
+        phx-click="toggle_room_active"
+        phx-value-id={@room.id}
+        class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded bg-ink text-paper text-sm font-medium hover:bg-accent transition-colors duration-150 shrink-0"
+      >
+        <.icon name="hero-play" class="size-3.5" /> Open room
+      </button>
+    </div>
+    """
+  end
+
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""

@@ -13,12 +13,6 @@ defmodule QaAppWeb.AudienceLive.Show do
          |> put_flash(:error, "Event room not found")
          |> redirect(to: "/")}
 
-      %{is_active: false} ->
-        {:ok,
-         socket
-         |> put_flash(:error, "This event is no longer active.")
-         |> redirect(to: "/")}
-
       room ->
         session_id = socket.assigns[:session_id]
 
@@ -156,7 +150,15 @@ defmodule QaAppWeb.AudienceLive.Show do
   end
 
   def handle_info({:room_settings_updated, room}, socket) do
-    {:noreply, assign(socket, :room, room)}
+    socket = assign(socket, :room, room)
+
+    # When the room flips back to active, re-stream the questions so the feed
+    # reflects anything that happened while visitors were on the not-ready view.
+    if room.is_active do
+      {:noreply, questions_stream(socket)}
+    else
+      {:noreply, socket}
+    end
   end
 
   defp own_question?(user_question, question),
@@ -212,8 +214,32 @@ defmodule QaAppWeb.AudienceLive.Show do
           </div>
         </header>
 
+        <!-- Not Ready (inactive room) -->
+        <section :if={!@room.is_active} id="room-not-ready" class="mt-12 max-w-2xl">
+          <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-accent motion-safe:animate-pulse"></span>
+            Room Not Ready
+          </p>
+
+          <h2 class="mt-4 text-2xl sm:text-3xl font-semibold tracking-[-0.03em] leading-[1.08] text-ink">
+            This room isn't open yet
+          </h2>
+
+          <p class="mt-3 max-w-md text-[15px] leading-relaxed text-ink-2">
+            {@room.title} hasn't started yet. This page stays open and will bring
+            you in automatically as soon as the room is ready.
+          </p>
+
+          <div class="mt-6 inline-flex items-center gap-2.5 rounded border border-line-strong px-4 py-3">
+            <span class="w-1.5 h-1.5 rounded-full bg-accent motion-safe:animate-pulse"></span>
+            <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums">
+              {@visitor_count} waiting
+            </span>
+          </div>
+        </section>
+
         <!-- Submission Form or Submitted Confirmation -->
-        <section class="mt-12">
+        <section :if={@room.is_active} class="mt-12">
           <%= if @submitted? do %>
             <div class="max-w-2xl">
               <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
@@ -317,7 +343,7 @@ defmodule QaAppWeb.AudienceLive.Show do
         </section>
 
         <!-- Live Audience Questions Feed -->
-        <section class="mt-14">
+        <section :if={@room.is_active} class="mt-14">
           <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 pb-3 border-b border-line">
             <h2 class="text-lg font-semibold tracking-[-0.01em] text-ink">
               Audience Questions

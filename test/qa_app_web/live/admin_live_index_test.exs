@@ -224,6 +224,180 @@ defmodule QaAppWeb.AdminLiveIndexTest do
     end
   end
 
+  describe "room status toggle" do
+    test "shows a per-row status switch and label in the rooms table", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "status-room",
+          "title" => "Status Room",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+
+      assert has_element?(view, "#room-active-toggle-#{room.id}")
+      html = view |> element("#room-active-toggle-#{room.id}") |> render()
+      assert html =~ ~s(role="switch")
+      assert html =~ ~s(aria-checked="true")
+    end
+
+    test "requires confirmation before deactivating a room from the table", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "toggle-room",
+          "title" => "Toggle Room",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+
+      # The first click on an active room only arms the confirmation; the room
+      # is not deactivated yet. It pops up as a centered modal instead of
+      # expanding the table row.
+      view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
+      assert Events.get_room!(room.id).is_active == true
+      assert has_element?(view, "#deactivate-confirm-modal")
+      assert has_element?(view, ~s(#room-deactivate-confirm))
+
+      # Cancelling keeps the room active and dismisses the prompt.
+      view
+      |> element(~s(#room-deactivate-confirm button[phx-click="cancel_room_inactive"]))
+      |> render_click()
+
+      assert Events.get_room!(room.id).is_active == true
+      refute has_element?(view, ~s(#room-deactivate-confirm))
+
+      # Arming again and confirming deactivates the room.
+      view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
+      assert has_element?(view, ~s(#room-deactivate-confirm))
+
+      view
+      |> element(~s(#room-deactivate-confirm button[phx-click="confirm_room_inactive"]))
+      |> render_click()
+
+      refute Events.get_room!(room.id).is_active
+
+      html = view |> element("#room-active-toggle-#{room.id}") |> render()
+      assert html =~ ~s(aria-checked="false")
+      refute has_element?(view, ~s(#room-deactivate-confirm))
+    end
+
+    test "opens an inactive room with a single click from the table", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "open-room",
+          "title" => "Open Room",
+          "char_limit" => 320,
+          "is_active" => false
+        })
+
+      view = open_admin(conn)
+
+      view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
+      assert Events.get_room!(room.id).is_active == true
+      refute has_element?(view, ~s(#room-deactivate-confirm))
+    end
+
+    test "auto-cancels the armed deactivation confirmation", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "auto-cancel-room",
+          "title" => "Auto Cancel Room",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+
+      view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
+      assert has_element?(view, "#deactivate-confirm-modal")
+      assert has_element?(view, ~s(#room-deactivate-confirm))
+
+      # The timeout fires (simulated directly) and cancels the prompt.
+      send(view.pid, :reset_room_confirm)
+      render(view)
+
+      refute has_element?(view, "#deactivate-confirm-modal")
+      refute has_element?(view, ~s(#room-deactivate-confirm))
+      assert Events.get_room!(room.id).is_active == true
+    end
+
+    test "create room modal can start a room as inactive", %{conn: conn} do
+      view = open_admin(conn)
+      view |> element(~s(button[phx-click="open_create_room"])) |> render_click()
+
+      assert has_element?(view, ~s(#create-room-form input[name="room[is_active]"]))
+      assert render(view) =~ ~s(id="room_is_active")
+
+      view
+      |> form("#create-room-form",
+        room: %{
+          "slug" => "inactive-new",
+          "title" => "Inactive New",
+          "moderator_id" => "",
+          "char_limit" => "320",
+          "expires_in" => "7 days",
+          "is_active" => "false"
+        }
+      )
+      |> render_submit()
+
+      assert render(view) =~ "Room created successfully."
+      assert Events.get_room_by_slug("inactive-new").is_active == false
+    end
+
+    test "configure room modal can change the active status", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "config-toggle",
+          "title" => "Config Toggle",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+      view |> element(~s(button[phx-click="open_configure_room"])) |> render_click()
+
+      view
+      |> form("#configure-room-form",
+        room: %{
+          "title" => "Config Toggle",
+          "slug" => "config-toggle",
+          "char_limit" => "320",
+          "is_active" => "false"
+        }
+      )
+      |> render_submit()
+
+      assert render(view) =~ "Room configured successfully."
+      assert Events.get_room!(room.id).is_active == false
+    end
+
+    test "live updates the status toggle when the room changes elsewhere", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "live-toggle-room",
+          "title" => "Live Toggle Room",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+
+      assert view |> element("#room-active-toggle-#{room.id}") |> render() =~
+               ~s(aria-checked="true")
+
+      # A moderator flips the status while the admin page is already open.
+      {:ok, _} = Events.update_room(room, %{"is_active" => "false"})
+
+      assert_eventually(fn ->
+        view |> element("#room-active-toggle-#{room.id}") |> render() =~ ~s(aria-checked="false")
+      end)
+    end
+  end
+
   defp assert_eventually(fun, timeout \\ 2_000) do
     if fun.() do
       :ok

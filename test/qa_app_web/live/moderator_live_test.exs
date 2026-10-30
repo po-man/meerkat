@@ -96,6 +96,68 @@ defmodule QaAppWeb.ModeratorLiveTest do
       assert html =~ ~s(id="moderator-rooms")
     end
 
+    test "room dashboard shows a status switch that requires confirmation to deactivate", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/dashboard")
+
+      assert has_element?(view, "#room-active-toggle-#{room.id}")
+
+      # First click only arms the confirmation; the room stays active. It
+      # pops up as a centered modal instead of expanding the room row.
+      view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
+      assert Events.get_room!(room.id).is_active == true
+      assert has_element?(view, "#deactivate-confirm-modal")
+      assert has_element?(view, ~s(#room-deactivate-confirm))
+
+      # Confirming deactivates the room.
+      view
+      |> element(~s(#room-deactivate-confirm button[phx-click="confirm_room_inactive"]))
+      |> render_click()
+
+      refute Events.get_room!(room.id).is_active
+    end
+
+    test "room dashboard opens an inactive room with a single click", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      room
+      |> Ecto.Changeset.change(is_active: false)
+      |> QaApp.Repo.update!()
+
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/dashboard")
+
+      view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
+
+      assert Events.get_room!(room.id).is_active == true
+      refute has_element?(view, ~s(#room-deactivate-confirm))
+    end
+
+    test "room dashboard live updates the status switch when the room changes elsewhere", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/dashboard")
+
+      assert view |> element("#room-active-toggle-#{room.id}") |> render() =~
+               ~s(aria-checked="true")
+
+      # An admin flips the status while the moderator dashboard is open.
+      {:ok, _} = Events.update_room(room, %{"is_active" => "false"})
+
+      assert_eventually(fn ->
+        view |> element("#room-active-toggle-#{room.id}") |> render() =~ ~s(aria-checked="false")
+      end)
+    end
+
     test "moderator page shows the question queue", %{conn: conn, owner: owner, room: room} do
       conn = login_as(conn, owner.username)
 
@@ -304,6 +366,92 @@ defmodule QaAppWeb.ModeratorLiveTest do
       assert html =~ "0"
       assert html =~ "live"
       assert html =~ "200"
+    end
+  end
+
+  defp assert_eventually(fun, timeout \\ 2_000) do
+    if fun.() do
+      :ok
+    else
+      if timeout <= 0 do
+        flunk("condition not met within the expected timeout")
+      else
+        Process.sleep(20)
+        assert_eventually(fun, timeout - 20)
+      end
+    end
+  end
+
+  describe "room open/close status on the questions page" do
+    setup do
+      {:ok, owner} =
+        Accounts.create_moderator(%{"username" => "status-owner", "password" => "secret123"})
+
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "status-room",
+          "title" => "Status Room",
+          "char_limit" => 320,
+          "is_active" => true,
+          "moderator_id" => owner.id
+        })
+
+      {:ok, owner: owner, room: room}
+    end
+
+    defp open_questions(conn, owner, slug) do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/r/#{slug}")
+      view
+    end
+
+    test "does not show the not-open banner when the room is active", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      view = open_questions(conn, owner, room.slug)
+
+      refute has_element?(view, "#room-not-open-banner")
+      refute has_element?(view, "#open-room-button")
+      assert view |> element("#moderator-visitor-count") |> render() =~ "live"
+    end
+
+    test "shows the not-open banner for an inactive room and opens it with one click", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      room
+      |> Ecto.Changeset.change(is_active: false)
+      |> QaApp.Repo.update!()
+
+      view = open_questions(conn, owner, room.slug)
+
+      assert has_element?(view, "#room-not-open-banner")
+      assert has_element?(view, "#open-room-button")
+      assert view |> element("#moderator-visitor-count") |> render() =~ "waiting"
+
+      view |> element("#open-room-button") |> render_click()
+
+      assert Events.get_room!(room.id).is_active == true
+      refute has_element?(view, "#room-not-open-banner")
+      assert view |> element("#moderator-visitor-count") |> render() =~ "live"
+    end
+
+    test "live shows the not-open banner when the room is deactivated elsewhere", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      view = open_questions(conn, owner, room.slug)
+
+      refute has_element?(view, "#room-not-open-banner")
+
+      {:ok, _} = Events.update_room(room, %{"is_active" => "false"})
+
+      assert_eventually(fn -> has_element?(view, "#room-not-open-banner") end)
+      assert view |> element("#moderator-visitor-count") |> render() =~ "waiting"
     end
   end
 end
