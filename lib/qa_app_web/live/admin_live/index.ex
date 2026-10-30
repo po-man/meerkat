@@ -30,7 +30,7 @@ defmodule QaAppWeb.AdminLive.Index do
      |> assign(:confirm_deactivate_room, nil)
      |> assign(:confirm_delete_room, nil)
      |> assign(:show_configure_room_modal?, false)
-     |> assign(:moderator_form, to_form(%{"username" => "", "password" => ""}, as: :moderator))}
+     |> assign(:moderator_form, to_form(Accounts.change_moderator(), as: :moderator))}
   end
 
   def handle_info({:room_expired, _room_id}, socket) do
@@ -96,13 +96,17 @@ defmodule QaAppWeb.AdminLive.Index do
   end
 
   def handle_event("open_create_moderator", _, socket) do
-    {:noreply, assign(socket, :show_create_moderator_modal?, true)}
+    {:noreply,
+     socket
+     |> assign(:show_create_moderator_modal?, true)
+     |> assign(:moderator_form, to_form(Accounts.change_moderator(), as: :moderator))}
   end
 
   def handle_event("close_create_moderator", _, socket) do
     {:noreply,
      socket
      |> assign(:show_create_moderator_modal?, false)
+     |> assign(:moderator_form, to_form(Accounts.change_moderator(), as: :moderator))
      |> assign(:confirm_deactivate_id, nil)
      |> assign(:confirm_deactivate_room, nil)}
   end
@@ -158,12 +162,8 @@ defmodule QaAppWeb.AdminLive.Index do
     end
   end
 
-  def handle_event(
-        "create_moderator",
-        %{"moderator" => %{"username" => username, "password" => password}},
-        socket
-      ) do
-    case Accounts.create_moderator(%{"username" => username, "password" => password}) do
+  def handle_event("create_moderator", %{"moderator" => moderator_params}, socket) do
+    case Accounts.create_moderator(moderator_params) do
       {:ok, _moderator} ->
         users = Accounts.list_users()
         moderators = Accounts.list_moderators()
@@ -173,12 +173,16 @@ defmodule QaAppWeb.AdminLive.Index do
          |> assign(:users, users)
          |> assign(:moderators, moderators)
          |> assign(:show_create_moderator_modal?, false)
+         |> assign(:moderator_form, to_form(Accounts.change_moderator(), as: :moderator))
          |> assign(:confirm_deactivate_id, nil)
          |> assign(:confirm_deactivate_room, nil)
          |> put_flash(:info, "Moderator account created successfully.")}
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to create Moderator account.")}
+      {:error, changeset} ->
+        {:noreply,
+         socket
+         |> assign(:moderator_form, to_form(changeset, as: :moderator))
+         |> put_flash(:error, "Failed to create Moderator account.")}
     end
   end
 

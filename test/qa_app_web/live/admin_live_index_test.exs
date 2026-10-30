@@ -463,6 +463,67 @@ defmodule QaAppWeb.AdminLiveIndexTest do
     end
   end
 
+  describe "create moderator form validation" do
+    test "shows an inline error for a too-short username", %{conn: conn} do
+      view = open_admin(conn)
+      view |> element(~s(button[phx-click="open_create_moderator"])) |> render_click()
+
+      view
+      |> form("#create-moderator-form",
+        moderator: %{"username" => "ab", "password" => "secret123"}
+      )
+      |> render_submit()
+
+      assert render(view) =~ "should be at least 3 character(s)"
+      assert has_element?(view, "#create-moderator-form")
+      refute Accounts.get_user_by_username("ab")
+    end
+
+    test "shows an inline error for a too-short password", %{conn: conn} do
+      view = open_admin(conn)
+      view |> element(~s(button[phx-click="open_create_moderator"])) |> render_click()
+
+      view
+      |> form("#create-moderator-form",
+        moderator: %{"username" => "new-mod", "password" => "12345"}
+      )
+      |> render_submit()
+
+      assert render(view) =~ "should be at least 6 character(s)"
+      assert has_element?(view, "#create-moderator-form")
+      refute Accounts.get_user_by_username("new-mod")
+    end
+
+    test "shows an inline error when the username is already taken", %{conn: conn} do
+      view = open_admin(conn)
+      view |> element(~s(button[phx-click="open_create_moderator"])) |> render_click()
+
+      view
+      |> form("#create-moderator-form",
+        moderator: %{"username" => "mod", "password" => "secret123"}
+      )
+      |> render_submit()
+
+      assert render(view) =~ "has already been taken"
+      assert has_element?(view, "#create-moderator-form")
+    end
+
+    test "creates a moderator with valid credentials", %{conn: conn} do
+      view = open_admin(conn)
+      view |> element(~s(button[phx-click="open_create_moderator"])) |> render_click()
+
+      view
+      |> form("#create-moderator-form",
+        moderator: %{"username" => "brand-new", "password" => "secret123"}
+      )
+      |> render_submit()
+
+      assert render(view) =~ "Moderator account created successfully."
+      assert Accounts.get_user_by_username("brand-new")
+      refute has_element?(view, "#create-moderator-form")
+    end
+  end
+
   describe "room expiry cleanup" do
     test "removes an expired room from the rooms table without a reload", %{conn: conn} do
       {:ok, room} =
