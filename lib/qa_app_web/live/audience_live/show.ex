@@ -227,8 +227,7 @@ defmodule QaAppWeb.AudienceLive.Show do
 
           <p class="mt-3 max-w-md text-[15px] leading-relaxed text-ink-2">
             {@room.title} hasn't started yet. This page stays open and will bring
-            you in automatically as soon as the room is ready — questions aren't
-            being accepted yet.
+            you in automatically as soon as the room is ready.
           </p>
 
           <div class="mt-6 inline-flex items-center gap-2.5 rounded border border-line-strong px-4 py-3">

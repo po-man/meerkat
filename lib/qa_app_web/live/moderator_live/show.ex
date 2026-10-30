@@ -138,74 +138,10 @@ defmodule QaAppWeb.ModeratorLive.Show do
     ~H"""
     <QaAppWeb.Layouts.app flash={@flash} current_user={@current_user}>
       <div class="max-w-6xl mx-auto px-6 pt-12 sm:pt-16 pb-24">
-        <!-- Masthead -->
-        <header class="border-b border-line pb-8">
-          <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-            <div>
-              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
-                <span class="w-2 h-2 bg-accent"></span>
-                Moderator Dashboard
-                <span class="text-ink-3/40 normal-case tracking-normal">/r/{@room.slug}</span>
-              </p>
-              <h1 class="mt-4 text-3xl sm:text-4xl font-semibold tracking-[-0.03em] leading-[1.05] text-ink">
-                {@room.title}
-              </h1>
-            </div>
-
-            <div class="flex items-center gap-3">
-              <span
-                id="moderator-room-status"
-                class="inline-flex items-center gap-1.5 h-10 px-3 rounded border border-line-strong bg-transparent font-mono text-[11px] uppercase tracking-[0.14em] tabular-nums"
-              >
-                <span class={[
-                  "w-1.5 h-1.5 rounded-full",
-                  if(@room.is_active, do: "bg-accent motion-safe:animate-pulse", else: "bg-ink/50")
-                ]}></span>
-                <span class={if(@room.is_active, do: "text-ink-2", else: "text-ink-3")}>
-                  <%= if @room.is_active do %>
-                    Open
-                  <% else %>
-                    Not open
-                  <% end %>
-                </span>
-              </span>
-
-              <button
-                :if={@room.is_active && @confirm_deactivate_id != @room.id}
-                id="close-room-trigger"
-                phx-click="toggle_room_active"
-                phx-value-id={@room.id}
-                class="inline-flex items-center gap-1.5 h-10 px-3 rounded text-[13px] font-medium text-ink-3 hover:text-ink hover:bg-surface transition-colors duration-150"
-              >
-                <.icon name="hero-lock-closed" class="size-4" /> Close room
-              </button>
-
-              <span
-                id="moderator-visitor-count"
-                class="hidden sm:inline-flex items-center gap-1.5 h-10 px-3 rounded border border-line-strong bg-transparent font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
-                {@visitor_count}
-                <span class="normal-case">live</span>
-                <%= if @room.max_visitors do %>
-                  <span class="text-ink-3">/ {@room.max_visitors}</span>
-                <% end %>
-              </span>
-
-              <button
-                phx-click="toggle_qr_modal"
-                class="inline-flex items-center gap-2 h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
-              >
-                <.icon name="hero-qr-code" class="size-4" /> Share QR Code
-              </button>
-            </div>
-          </div>
-        </header>
-
         <%= if !@room.is_active do %>
           <div
             id="room-not-open-banner"
-            class="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded border border-line-strong px-4 py-3"
+            class="mb-10 flex flex-col sm:flex-row sm:items-center flex-col-reverse justify-between gap-3 rounded border border-line-strong px-4 py-3"
           >
             <div class="flex items-center gap-3 min-w-0">
               <span class="w-2 h-2 rounded-full bg-ink/50 shrink-0"></span>
@@ -228,6 +164,48 @@ defmodule QaAppWeb.ModeratorLive.Show do
             </button>
           </div>
         <% end %>
+
+        <!-- Masthead -->
+        <header class="border-b border-line pb-8">
+          <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div>
+              <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
+                <span class="w-2 h-2 bg-accent"></span>
+                Moderator Dashboard
+                <span class="text-ink-3/40 normal-case tracking-normal">/r/{@room.slug}</span>
+              </p>
+              <h1 class="mt-4 text-3xl sm:text-4xl font-semibold tracking-[-0.03em] leading-[1.05] text-ink">
+                {@room.title}
+              </h1>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <span
+                id="moderator-visitor-count"
+                class="inline-flex items-center gap-1.5 h-10 px-3 rounded border border-line-strong bg-transparent font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+                {@visitor_count}
+                <%= if @room.is_active do %>
+                  live
+                <% else %>
+                  waiting
+                <% end %>
+                <%= if @room.max_visitors do %>
+                  <span class="text-ink-3">/ {@room.max_visitors}</span>
+                <% end %>
+              </span>
+
+              <button
+                phx-click="toggle_qr_modal"
+                class="inline-flex items-center gap-2 h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
+              >
+                <.icon name="hero-qr-code" class="size-4" />
+                Invite
+              </button>
+            </div>
+          </div>
+        </header>
 
         <%= if @confirm_deactivate_id == @room.id do %>
           <div class="mt-6">
