@@ -106,8 +106,10 @@ defmodule QaAppWeb.AdminLive.Index do
   end
 
   def handle_event("close_create_moderator", _, socket) do
-    {:noreply, assign(socket, :show_create_moderator_modal?, false)}
-    |> assign(:confirm_deactivate_id, nil)
+    {:noreply,
+     socket
+     |> assign(:show_create_moderator_modal?, false)
+     |> assign(:confirm_deactivate_id, nil)}
   end
 
   def handle_event("create_room", %{"room" => room_params}, socket) do
