@@ -300,30 +300,6 @@ defmodule QaAppWeb.AdminLiveIndexTest do
       refute has_element?(view, ~s(#room-deactivate-confirm))
     end
 
-    test "auto-cancels the armed deactivation confirmation", %{conn: conn} do
-      {:ok, room} =
-        Events.create_room(%{
-          "slug" => "auto-cancel-room",
-          "title" => "Auto Cancel Room",
-          "char_limit" => 320,
-          "is_active" => true
-        })
-
-      view = open_admin(conn)
-
-      view |> element(~s(#room-active-toggle-#{room.id})) |> render_click()
-      assert has_element?(view, "#deactivate-confirm-modal")
-      assert has_element?(view, ~s(#room-deactivate-confirm))
-
-      # The timeout fires (simulated directly) and cancels the prompt.
-      send(view.pid, :reset_room_confirm)
-      render(view)
-
-      refute has_element?(view, "#deactivate-confirm-modal")
-      refute has_element?(view, ~s(#room-deactivate-confirm))
-      assert Events.get_room!(room.id).is_active == true
-    end
-
     test "create room modal can start a room as inactive", %{conn: conn} do
       view = open_admin(conn)
       view |> element(~s(button[phx-click="open_create_room"])) |> render_click()
@@ -395,6 +371,82 @@ defmodule QaAppWeb.AdminLiveIndexTest do
       assert_eventually(fn ->
         view |> element("#room-active-toggle-#{room.id}") |> render() =~ ~s(aria-checked="false")
       end)
+    end
+  end
+
+  describe "delete room confirmation" do
+    setup do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "delete-room",
+          "title" => "Delete Room",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      {:ok, room: room}
+    end
+
+    test "the row Delete button arms a styled modal instead of a native prompt", %{
+      conn: conn,
+      room: room
+    } do
+      view = open_admin(conn)
+
+      # The native browser confirm is gone...
+      refute has_element?(
+               view,
+               ~s(button[data-confirm="Are you sure you want to delete this room?"])
+             )
+
+      # ...and a plain click only arms the confirmation, keeping the room.
+      view |> element(~s(button[phx-click="arm_delete_room"])) |> render_click()
+
+      assert Events.get_room!(room.id)
+      assert has_element?(view, "#delete-confirm-modal")
+      assert has_element?(view, ~s(#room-delete-confirm))
+      assert render(view) =~ "Delete this room?"
+    end
+
+    test "cancelling the confirmation keeps the room", %{conn: conn, room: room} do
+      view = open_admin(conn)
+
+      view |> element(~s(button[phx-click="arm_delete_room"])) |> render_click()
+
+      view
+      |> element(~s(#room-delete-confirm button[phx-click="cancel_delete_room"]))
+      |> render_click()
+
+      assert Events.get_room!(room.id)
+      refute has_element?(view, "#delete-confirm-modal")
+      refute has_element?(view, ~s(#room-delete-confirm))
+    end
+
+    test "confirming deletes the room and dismisses the modal", %{conn: conn, room: _room} do
+      view = open_admin(conn)
+
+      view |> element(~s(button[phx-click="arm_delete_room"])) |> render_click()
+
+      view
+      |> element(~s(#room-delete-confirm button[phx-click="confirm_delete_room"]))
+      |> render_click()
+
+      refute Events.get_room_by_slug("delete-room")
+      assert render(view) =~ "Room deleted successfully."
+      refute has_element?(view, "#delete-confirm-modal")
+    end
+
+    test "closing via the modal's close button dismisses it", %{conn: conn, room: room} do
+      view = open_admin(conn)
+
+      view |> element(~s(button[phx-click="arm_delete_room"])) |> render_click()
+      assert has_element?(view, "#delete-confirm-modal")
+
+      view |> element(~s(button[phx-click="close_delete_room"])) |> render_click()
+
+      assert Events.get_room!(room.id)
+      refute has_element?(view, "#delete-confirm-modal")
+      refute has_element?(view, ~s(#room-delete-confirm))
     end
   end
 

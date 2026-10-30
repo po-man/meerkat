@@ -6,10 +6,6 @@ defmodule QaAppWeb.AdminLive.Index do
   alias QaApp.Accounts
   alias QaApp.RoomCapacity
 
-  # How long an armed "deactivate room" confirmation stays open before it
-  # auto-cancels, protecting against an accidental close.
-  @deactivate_confirm_timeout 6_000
-
   def mount(_params, _session, socket) do
     users = Accounts.list_users()
     moderators = Accounts.list_moderators()
@@ -32,6 +28,7 @@ defmodule QaAppWeb.AdminLive.Index do
      |> assign(:show_create_moderator_modal?, false)
      |> assign(:confirm_deactivate_id, nil)
      |> assign(:confirm_deactivate_room, nil)
+     |> assign(:confirm_delete_room, nil)
      |> assign(:show_configure_room_modal?, false)
      |> assign(:moderator_form, to_form(%{"username" => "", "password" => ""}, as: :moderator))}
   end
@@ -61,22 +58,14 @@ defmodule QaAppWeb.AdminLive.Index do
 
   # A room's settings changed from another view (moderator dashboard, settings
   # tab, or a status toggle). Refresh the streamed rows so the status toggle
-  # and labels stay live, and clear any armed deactivation confirmation.
+  # and labels stay live, and clear any armed confirmations.
   def handle_info({:rooms_settings_updated, _room}, socket) do
     {:noreply,
      socket
      |> assign(:confirm_deactivate_id, nil)
      |> assign(:confirm_deactivate_room, nil)
+     |> assign(:confirm_delete_room, nil)
      |> stream_rooms()}
-  end
-
-  # The armed "deactivate room" confirmation timed out; cancel it so an
-  # accidental close can't happen after the moderator walked away.
-  def handle_info(:reset_room_confirm, socket) do
-    {:noreply,
-     stream_rooms(socket)
-     |> assign(:confirm_deactivate_id, nil)
-     |> assign(:confirm_deactivate_room, nil)}
   end
 
   def handle_event("open_create_room", _, socket) do
@@ -193,10 +182,32 @@ defmodule QaAppWeb.AdminLive.Index do
     end
   end
 
-  def handle_event("delete_room", %{"id" => id}, socket) do
+  # Clicking "Delete" on a room row only arms a confirmation modal; the room
+  # stays until the admin confirms from that panel.
+  def handle_event("arm_delete_room", %{"id" => id}, socket) do
+    room = Events.get_room!(id)
+    {:noreply, assign(socket, :confirm_delete_room, room)}
+  end
+
+  def handle_event("confirm_delete_room", %{"id" => id}, socket) do
     room = Events.get_room!(id)
     {:ok, _} = Events.delete_room(room)
-    {:noreply, stream_rooms(socket)}
+
+    {:noreply,
+     socket
+     |> assign(:confirm_delete_room, nil)
+     |> stream_rooms()
+     |> put_flash(:info, "Room deleted successfully.")}
+  end
+
+  # The panel's own Cancel button; `close_delete_room` handles the modal's
+  # close button and outside clicks.
+  def handle_event("cancel_delete_room", %{"id" => _id}, socket) do
+    {:noreply, assign(socket, :confirm_delete_room, nil)}
+  end
+
+  def handle_event("close_delete_room", _, socket) do
+    {:noreply, assign(socket, :confirm_delete_room, nil)}
   end
 
   def handle_event("toggle_room_active", %{"id" => id}, socket) do
@@ -205,8 +216,6 @@ defmodule QaAppWeb.AdminLive.Index do
     # Opening a room is a single click; deactivating arms a confirmation so
     # an admin can't accidentally hide questions from visitors.
     if room.is_active do
-      Process.send_after(self(), :reset_room_confirm, @deactivate_confirm_timeout)
-
       {:noreply,
        socket
        |> assign(:confirm_deactivate_id, room.id)
@@ -388,8 +397,7 @@ defmodule QaAppWeb.AdminLive.Index do
                       <span class={[
                         "font-mono text-[11px] uppercase tracking-[0.14em]",
                         if(room.is_active, do: "text-ink-2", else: "text-ink-3")
-                      ]}>
-                      </span>
+                      ]}></span>
                     </div>
                   </td>
                   <td class="py-4 pr-4 align-top font-mono text-xs tabular-nums text-ink-2">
@@ -411,9 +419,8 @@ defmodule QaAppWeb.AdminLive.Index do
                         Moderate
                       </.link>
                       <button
-                        phx-click="delete_room"
+                        phx-click="arm_delete_room"
                         phx-value-id={room.id}
-                        data-confirm="Are you sure you want to delete this room?"
                         class="text-[13px] font-medium text-danger hover:underline underline-offset-4 transition-colors"
                       >
                         Delete
@@ -431,6 +438,15 @@ defmodule QaAppWeb.AdminLive.Index do
           <.modal close_event="close_deactivate_confirm">
             <div id="deactivate-confirm-modal">
               <.deactivate_confirm room={@confirm_deactivate_room} variant="modal" />
+            </div>
+          </.modal>
+        <% end %>
+
+        <!-- Delete Room Confirmation Modal -->
+        <%= if @confirm_delete_room do %>
+          <.modal close_event="close_delete_room">
+            <div id="delete-confirm-modal">
+              <.delete_confirm room={@confirm_delete_room} />
             </div>
           </.modal>
         <% end %>

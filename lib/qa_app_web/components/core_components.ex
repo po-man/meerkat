@@ -476,6 +476,113 @@ defmodule QaAppWeb.CoreComponents do
   end
 
   @doc """
+  Renders the centered, danger-styled confirmation panel used inside the
+  admin and moderator modals.
+
+  It lays out an overline danger label, the affected room's title, an
+  optional inner copy, and Cancel/Confirm actions wired to a shared event
+  pair. Both the "close room" and "delete room" prompts render through it so
+  the two confirmations stay visually identical.
+
+  ## Examples
+
+      <.confirm_modal
+        id_prefix={"row-\#{room.id}"}
+        room={room}
+        eyebrow="Delete this room?"
+        confirm_label="Delete room"
+        confirm_icon="hero-trash"
+        confirm_event="confirm_delete_room"
+        cancel_event="cancel_delete_room"
+      >
+        The room and its questions will be permanently removed.
+      </.confirm_modal>
+  """
+  attr :room, :map, required: true
+  attr :id_prefix, :string, required: true
+  attr :eyebrow, :string, required: true
+  attr :confirm_label, :string, required: true
+  attr :confirm_icon, :string, required: true
+  attr :confirm_event, :string, required: true
+  attr :cancel_event, :string, required: true
+
+  slot :inner_block
+
+  def confirm_modal(assigns) do
+    ~H"""
+    <div id={"#{@id_prefix}-confirm"}>
+      <div class="flex items-start gap-3 min-w-0">
+        <span class="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-danger"></span>
+        <div class="min-w-0">
+          <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-danger">
+            {@eyebrow}
+          </p>
+          <h3 class="mt-1.5 text-xl font-semibold tracking-[-0.02em] text-ink">
+            {@room.title}
+          </h3>
+          <p class="mt-2 text-[13px] leading-relaxed text-ink-2">
+            {render_slot(@inner_block)}
+          </p>
+        </div>
+      </div>
+      <div class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4 border-t border-line">
+        <button
+          type="button"
+          phx-click={@cancel_event}
+          phx-value-id={@room.id}
+          class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          phx-click={@confirm_event}
+          phx-value-id={@room.id}
+          class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded bg-danger text-paper text-sm font-medium hover:bg-ink transition-colors duration-150"
+        >
+          <.icon name={@confirm_icon} class="size-4" /> {@confirm_label}
+        </button>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders the confirmation shown before a room is permanently deleted from
+  the admin control center.
+
+  Mirrors the "close room" prompt (`deactivate_confirm` modal variant): a
+  centered danger panel with the room's title and Cancel/Delete actions. The
+  buttons fire the shared `confirm_delete_room` and `cancel_delete_room`
+  events with the room's id.
+
+  ## Examples
+
+      <.delete_confirm room={room} />
+  """
+  attr :room, :map, required: true
+  attr :id_prefix, :string, default: "room-delete"
+  attr :confirm_event, :string, default: "confirm_delete_room"
+  attr :cancel_event, :string, default: "cancel_delete_room"
+
+  def delete_confirm(assigns) do
+    ~H"""
+    <.confirm_modal
+      id_prefix={@id_prefix}
+      room={@room}
+      eyebrow="Delete this room?"
+      confirm_label="Delete room"
+      confirm_icon="hero-trash"
+      confirm_event={@confirm_event}
+      cancel_event={@cancel_event}
+    >
+      This permanently removes {@room.title} together with all of its questions
+      and votes. This cannot be undone.
+    </.confirm_modal>
+    """
+  end
+
+  @doc """
   Renders the two-step confirmation shown before a room is deactivated.
 
   It warns that visitors will be put on the waiting page and can't see
@@ -509,45 +616,17 @@ defmodule QaAppWeb.CoreComponents do
   def deactivate_confirm(assigns) do
     ~H"""
     <%= if @variant == "modal" do %>
-      <div id={"#{@id_prefix}-confirm"}>
-        <div class="flex items-start gap-3 min-w-0">
-          <span class="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-danger"></span>
-          <div class="min-w-0">
-            <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-danger">
-              Close this room?
-            </p>
-            <h3 class="mt-1.5 text-xl font-semibold tracking-[-0.02em] text-ink">
-              {@room.title}
-            </h3>
-            <p class="mt-2 text-[13px] leading-relaxed text-ink-2">
-              <%= case render_slot(@inner_block) do %>
-                <% [] -> %>
-                  Visitors will see the waiting page and can't see questions until the room is open again.
-                <% content -> %>
-                  {content}
-              <% end %>
-            </p>
-          </div>
-        </div>
-        <div class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4 border-t border-line">
-          <button
-            type="button"
-            phx-click={@cancel_event}
-            phx-value-id={@room.id}
-            class="inline-flex items-center justify-center h-10 px-4 rounded border border-line-strong bg-transparent text-ink text-sm font-medium hover:border-ink transition-colors duration-150"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            phx-click={@confirm_event}
-            phx-value-id={@room.id}
-            class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded bg-danger text-paper text-sm font-medium hover:bg-ink transition-colors duration-150"
-          >
-            <.icon name="hero-lock-closed" class="size-4" /> Close room
-          </button>
-        </div>
-      </div>
+      <.confirm_modal
+        id_prefix={@id_prefix}
+        room={@room}
+        eyebrow="Close this room?"
+        confirm_label="Close room"
+        confirm_icon="hero-lock-closed"
+        confirm_event={@confirm_event}
+        cancel_event={@cancel_event}
+      >
+        Visitors will see the waiting page and can't see questions until the room is open again.
+      </.confirm_modal>
     <% else %>
       <div id={"#{@id_prefix}-confirm"} class="rounded border border-danger/40 bg-surface">
         <div class={[
