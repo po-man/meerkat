@@ -2,12 +2,16 @@ defmodule QaAppWeb.ModeratorLive.Settings do
   use QaAppWeb, :live_view
 
   alias QaApp.Events
+  alias QaApp.RoomCapacity
   alias QaAppWeb.ModeratorLive.RoomAuth
 
   def mount(params, _session, socket) do
     case RoomAuth.authorize(socket, params) do
       {:ok, socket} ->
-        {:ok, socket |> assign(:settings_form, settings_form(socket.assigns.room))}
+        {:ok,
+         socket
+         |> assign(:visitor_count, RoomCapacity.count(socket.assigns.room.id))
+         |> assign(:settings_form, settings_form(socket.assigns.room))}
 
       {:redirect, socket} ->
         {:ok, socket}
@@ -59,6 +63,11 @@ defmodule QaAppWeb.ModeratorLive.Settings do
      |> assign(:settings_form, settings_form(room))}
   end
 
+  # Visitor presence changed (join/leave); refresh the live count.
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    {:noreply, assign(socket, :visitor_count, RoomCapacity.count(socket.assigns.room.id))}
+  end
+
   defp settings_form(room), do: Events.change_room(room) |> to_form()
 
   # The toggle renders a hidden `false` plus a visible checkbox for the same
@@ -99,6 +108,22 @@ defmodule QaAppWeb.ModeratorLive.Settings do
             </div>
 
             <div class="flex items-center gap-3">
+              <span
+                id="moderator-visitor-count"
+                class="inline-flex items-center gap-1.5 h-10 px-3 rounded border border-line-strong bg-transparent font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+                {@visitor_count}
+                <%= if @room.is_active do %>
+                  live
+                <% else %>
+                  waiting
+                <% end %>
+                <%= if @room.max_visitors do %>
+                  <span class="text-ink-3">/ {@room.max_visitors}</span>
+                <% end %>
+              </span>
+
               <.link
                 href={~p"/moderator/r/#{@room.slug}/export.csv"}
                 target="_blank"

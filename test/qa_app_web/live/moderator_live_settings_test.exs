@@ -186,6 +186,31 @@ defmodule QaAppWeb.ModeratorLiveSettingsTest do
       assert Events.get_room!(room.id).is_active == false
     end
 
+    test "shows the live visitor count and updates it as visitors join", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}/settings")
+
+      assert has_element?(view, "#moderator-visitor-count")
+
+      html = view |> element("#moderator-visitor-count") |> render()
+      assert html =~ "0"
+      assert html =~ "live"
+
+      # A visitor joins while the settings page is open; the count updates live.
+      {:ok, _audience_view, _html} =
+        Phoenix.ConnTest.build_conn()
+        |> Plug.Test.init_test_session(%{"session_id" => "settings-visitor"})
+        |> live("/r/#{room.slug}")
+
+      assert_eventually(fn ->
+        view |> element("#moderator-visitor-count") |> render() =~ "1"
+      end)
+    end
+
     test "redirects a moderator who does not own the room", %{conn: conn, room: room} do
       {:ok, other} =
         Accounts.create_moderator(%{"username" => "other-mod", "password" => "secret123"})
@@ -198,6 +223,19 @@ defmodule QaAppWeb.ModeratorLiveSettingsTest do
     test "redirects anonymous visitors to sign in", %{conn: conn, room: room} do
       conn = get(conn, "/moderator/r/#{room.slug}/settings")
       assert redirected_to(conn) == AdminAuth.secret_path()
+    end
+  end
+
+  defp assert_eventually(fun, timeout \\ 2_000) do
+    if fun.() do
+      :ok
+    else
+      if timeout <= 0 do
+        flunk("condition not met within the expected timeout")
+      else
+        Process.sleep(20)
+        assert_eventually(fun, timeout - 20)
+      end
     end
   end
 end
