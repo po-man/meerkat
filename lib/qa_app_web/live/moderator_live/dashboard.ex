@@ -3,10 +3,6 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
 
   alias QaApp.Events
 
-  # How long an armed "deactivate room" confirmation stays open before it
-  # auto-cancels, protecting against an accidental close.
-  @deactivate_confirm_timeout 6_000
-
   def mount(_params, _session, socket) do
     if connected?(socket) do
       Events.subscribe_rooms()
@@ -25,18 +21,8 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
 
   # A room's settings changed from another view (admin control center or the
   # room settings tab). Refresh the rows so the status toggle stays live, and
-  # clear any armed deactivation confirmation.
+  # clear any armed confirmation.
   def handle_info({:rooms_settings_updated, _room}, socket) do
-    {:noreply,
-     socket
-     |> assign(:confirm_deactivate_id, nil)
-     |> assign(:confirm_deactivate_room, nil)
-     |> stream_rooms()}
-  end
-
-  # The armed "deactivate room" confirmation timed out; cancel it so an
-  # accidental close can't happen after the moderator walked away.
-  def handle_info(:reset_room_confirm, socket) do
     {:noreply,
      socket
      |> assign(:confirm_deactivate_id, nil)
@@ -50,8 +36,6 @@ defmodule QaAppWeb.ModeratorLive.Dashboard do
     # Opening a room is a single click; deactivating arms a confirmation so a
     # moderator can't accidentally hide questions from visitors.
     if room.is_active do
-      Process.send_after(self(), :reset_room_confirm, @deactivate_confirm_timeout)
-
       {:noreply,
        socket
        |> assign(:confirm_deactivate_id, room.id)

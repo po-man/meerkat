@@ -36,13 +36,20 @@ defmodule QaApp.Accounts do
   end
 
   def create_moderator(attrs) do
-    attrs_with_defaults =
-      attrs
-      |> Map.put("role", :moderator)
-
-    %User{}
-    |> User.registration_changeset(attrs_with_defaults)
+    attrs
+    |> change_moderator()
     |> Repo.insert()
+  end
+
+  @doc """
+  Builds a moderator changeset from the given attributes, applying the role
+  and username/password rules shared with `create_moderator/1`. Used to seed
+  the "Add Moderator" form and to re-surface validation errors in it.
+  """
+  def change_moderator(attrs \\ %{}) do
+    attrs
+    |> Map.put("role", :moderator)
+    |> then(&User.registration_changeset(%User{}, &1))
   end
 
   def update_user_password(%User{} = user, attrs) do
