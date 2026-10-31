@@ -152,6 +152,14 @@ The pipeline (`.github/workflows/release.yml`):
    `docker compose pull`, `up -d --no-deps web`, then polls `/healthz` for up to
    60 s. A failing probe fails the deployment.
 
+### Dry run
+
+Run the **Release** workflow manually with `dry_run` enabled to exercise the
+pipeline without a host: tests run, the image is built and pushed, but only under
+the scratch tag `ghcr.io/po-man/meerkat:dry-run-<sha>` — no release tag, no
+`:latest` move, no deployment. Useful as a first end-to-end check before the VM
+and deploy secrets exist.
+
 ### GitHub setup
 
 Repository secrets (Settings → Secrets and variables → Actions):

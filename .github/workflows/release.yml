@@ -6,6 +6,10 @@ name: Release
 #
 # To roll back, run this workflow manually (workflow_dispatch) with the
 # `image_tag` of a previously released build; the image is not rebuilt.
+#
+# To prove the pipeline without a host, dispatch with `dry_run`: the image is
+# still built and pushed under its release tag, but `:latest` is not moved and
+# nothing is deployed.
 
 on:
   push:
@@ -17,6 +21,10 @@ on:
         description: Existing image tag to deploy, e.g. release.2026.10.30.1
         required: true
         type: string
+      dry_run:
+        description: Build the image but do not deploy it
+        type: boolean
+        default: false
 
 # Never run two production deployments at once, and never cancel one midway.
 concurrency:
@@ -42,6 +50,7 @@ jobs:
         id: tag
         env:
           REQUESTED_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || github.ref_name }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -eu
 
@@ -58,7 +67,12 @@ jobs:
           fi
 
           echo "image_tag=$REQUESTED_TAG" >> "$GITHUB_OUTPUT"
-          echo "### Deploying \`$REQUESTED_TAG\`" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            echo "### Dry run: building \`$REQUESTED_TAG\` under a scratch tag, not deploying" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Deploying \`$REQUESTED_TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   # Same job that runs on every PR: a tag can never ship untested code.
   test:
@@ -73,7 +87,8 @@ jobs:
     needs: [verify, test]
     # A rollback deploys an image that already exists, so never rebuild it:
     # rebuilding from the current main would overwrite an older tag with new code.
-    if: github.event_name != 'workflow_dispatch'
+    # A dry run does build, but only under a scratch tag (see "Resolve tags").
+    if: github.event_name != 'workflow_dispatch' || inputs.dry_run == true
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     permissions:
@@ -91,15 +106,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve image tags
+        id: tags
+        env:
+          IMAGE_TAG: ${{ needs.verify.outputs.image_tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -eu
+
+          if [ "$DRY_RUN" = "true" ]; then
+            # Never touch a release tag or :latest on a dry run.
+            echo "tags=ghcr.io/po-man/meerkat:dry-run-$(printf '%.7s' "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=ghcr.io/po-man/meerkat:$IMAGE_TAG,ghcr.io/po-man/meerkat:latest" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/arm64
           push: true
-          tags: |
-            ghcr.io/po-man/meerkat:${{ needs.verify.outputs.image_tag }}
-            ghcr.io/po-man/meerkat:latest
+          tags: ${{ steps.tags.outputs.tags }}
           labels: |
             org.opencontainers.image.source=https://github.com/po-man/meerkat
             org.opencontainers.image.revision=${{ github.sha }}
@@ -113,6 +141,7 @@ jobs:
     # `build-push` is skipped on a manual rollback, so accept either outcome.
     if: >-
       always()
+      && inputs.dry_run != true
       && needs.verify.result == 'success'
       && (needs.build-push.result == 'success' || needs.build-push.result == 'skipped')
     runs-on: ubuntu-24.04-arm
