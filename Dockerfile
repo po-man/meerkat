@@ -1,53 +1,112 @@
-# Multi-stage Dockerfile for Elixir Release
+# This file is based on these images:
+#
+#   - https://hub.docker.com/r/hexpm/elixir/tags - for the builder image
+#     E.g.: docker.io/hexpm/elixir:1.20.4-erlang-29.1.2-debian-trixie-20261027-slim
+#   - https://hub.docker.com/_/debian/tags?name=trixie-20261027-slim - for the runner image
+#     E.g.: docker.io/debian:trixie-20261027-slim
+#
+# Find builder and runner images on Docker Hub or on Hex's Build Server (Bob).
+# We recommend using Bob's Web UI to find recent tags:
+#
+#   - https://bob.hex.pm/docker?repo=hexpm/elixir&os=debian&sort=elixir_version,erlang_version,os_version
+#
+# We suggest using the same Debian version for both the builder and runner images.
+#
+# We suggest Debian/Ubuntu instead of Alpine to avoid production compatibility issues
+# (such as DNS resolution failures, and dynamically linked NIFs/precompiled binaries).
+#
+# For finding packages in Debian, search on https://packages.debian.org/.
 
-# --- Stage 1: Build Image ---
-FROM elixir:1.16-alpine AS builder
+ARG ELIXIR_VERSION=1.20.4
+ARG OTP_VERSION=29.1.2
+ARG DEBIAN_VERSION=trixie-20261027-slim
 
-# Install build dependencies
-RUN apk add --no-ca-cache build-base git nodejs npm
+ARG BUILDER_IMAGE="docker.io/hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION}"
+ARG RUNNER_IMAGE="docker.io/debian:${DEBIAN_VERSION}"
 
+FROM ${BUILDER_IMAGE} AS builder
+
+# install build dependencies
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends build-essential git \
+  && rm -rf /var/lib/apt/lists/*
+
+# prepare build dir
 WORKDIR /app
 
-# Install Hex and Rebar
-RUN mix local.hex --force && mix local.rebar --force
+# install hex + rebar
+RUN mix local.hex --force \
+  && mix local.rebar --force
 
-# Set build environment
-ENV MIX_ENV=prod
+# set build ENV
+ENV MIX_ENV="prod"
 
-# Copy mix files and fetch dependencies
+# install mix dependencies
 COPY mix.exs mix.lock ./
-RUN mix deps.get --only prod
+RUN mix deps.get --only $MIX_ENV
+RUN mkdir config
+
+# copy compile-time config files before we compile dependencies
+# to ensure any relevant config change will trigger the dependencies
+# to be re-compiled.
+COPY config/config.exs config/${MIX_ENV}.exs config/
 RUN mix deps.compile
 
-# Copy assets and build assets
-COPY assets assets
+RUN mix assets.setup
+
 COPY priv priv
+
 COPY lib lib
+
+# Compile the release
+RUN mix compile
+
+COPY assets assets
+
+# compile assets
 RUN mix assets.deploy
 
-# Compile release
-RUN mix compile
+# Changes to config/runtime.exs don't require recompiling the code
+COPY config/runtime.exs config/
+
+COPY rel rel
 RUN mix release
 
-# --- Stage 2: Runtime Image ---
-FROM alpine:3.19 AS runner
+# start a new build stage so that the final image will only contain
+# the compiled release and other runtime necessities
+FROM ${RUNNER_IMAGE} AS final
 
-RUN apk add --no-ca-cache libstdc++ ncurses-libs sqlite-dev tzdata
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 locales ca-certificates curl \
+  && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Set the locale
+RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
+  && locale-gen
 
-# Copy release from builder
-COPY --from=builder /app/_build/prod/rel/qa_app ./
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
 
-# Create data directory for persistent SQLite database
-RUN mkdir -p /app/data && chown -R nobody:nobody /app
+WORKDIR "/app"
+RUN chown nobody /app
+
+# Persistent SQLite location. Mount a volume here in production: the file lives
+# outside /app so redeploys never touch the data.
+ENV DATABASE_PATH="/data/prod.sqlite3"
+RUN mkdir -p /data && chown nobody /data
+
+# set runner ENV
+ENV MIX_ENV="prod"
+
+# Only copy the final release from the build stage
+COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/qa_app ./
 
 USER nobody
 
-ENV PORT=4000
-ENV PHX_SERVER=true
-ENV DATABASE_PATH=/app/data/prod.sqlite3
+# If using an environment that doesn't automatically reap zombie processes, it is
+# advised to add an init process such as tini via `apt-get install`
+# above and adding an entrypoint. See https://github.com/krallin/tini for details
+# ENTRYPOINT ["/tini", "--"]
 
-EXPOSE 4000
-
-CMD ["bin/qa_app", "start"]
+CMD ["/app/bin/server"]
