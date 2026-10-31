@@ -133,14 +133,51 @@ admin account with `ADMIN_ACCESS_CODE`.
 
 ## Deploying a release
 
-Push a tag; GitHub Actions builds an arm64 image, pushes it to GHCR, and runs the
-deploy step over SSH:
+Tag a commit on `main`; GitHub Actions runs the tests, builds the arm64 image,
+pushes it to GHCR, and deploys it over SSH:
 
 ```bash
-git tag release.2026.10.31.1 && git push origin release.2026.10.31.1
+git tag release.2026.10.31.1
+git push origin release.2026.10.31.1
 ```
 
-Manually, on the host:
+The pipeline (`.github/workflows/release.yml`):
+
+1. **verify** — the tag must match `release.YYYY.MM.DD.X` and the commit must be
+   an ancestor of `main`.
+2. **test** — runs the same workflow as every PR (`mix precommit`).
+3. **build-push** — `ghcr.io/po-man/meerkat:<tag>` plus `:latest`, arm64 only.
+4. **deploy** — over SSH: `git fetch` + `git checkout <tag>` in `/srv/meerkat`
+   (so the compose file and deploy scripts always match the running image),
+   `docker compose pull`, `up -d --no-deps web`, then polls `/healthz` for up to
+   60 s. A failing probe fails the deployment.
+
+### GitHub setup
+
+Repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|--------|-------|
+| `DEPLOY_HOST` | Public IP or hostname of the VM. |
+| `DEPLOY_USER` | SSH user (member of the `docker` group). |
+| `DEPLOY_SSH_KEY` | Private key for that user (paste the whole key, including header/footer). |
+
+Two host-side requirements the pipeline depends on:
+
+- **Read access to the repo**, because the deploy step does `git fetch` in
+  `/srv/meerkat`. Use a read-only deploy key for the host.
+- **Read access to the GHCR package**, because the deploy step runs
+  `docker compose pull`. Either make `ghcr.io/po-man/meerkat` public, or run
+  `docker login ghcr.io -u <user> --password-stdin` once on the host with a
+  token that has `read:packages`.
+
+Optional hardening: add `fingerprint: <host key fingerprint>` to the SSH step.
+
+The host checkout is managed by the pipeline: `git checkout --force <tag>` means
+local edits to tracked files (compose file, deploy scripts) are discarded on every
+deploy. Keep host-specific settings in `deploy/env.prod`, which is gitignored.
+
+### Deploying by hand
 
 ```bash
 cd /srv/meerkat
@@ -151,11 +188,12 @@ curl -fsS http://127.0.0.1:4000/healthz
 
 ### Rollback
 
-Re-run the workflow with the previous `image_tag` (`workflow_dispatch`), or:
+Run the **Release** workflow manually (`workflow_dispatch`) with the previous
+`image_tag`. Nothing is rebuilt or retagged — the existing image is redeployed,
+so the rollback is exactly the code that ran before. Manually:
 
 ```bash
 IMAGE_TAG=release.<previous> docker compose -f compose.prod.yml up -d --no-deps web
-```
 
 Migrations are applied automatically and never reversed by a rollback, so any
 schema change must be **backwards compatible with the previous image**
