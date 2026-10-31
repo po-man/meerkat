@@ -146,7 +146,7 @@ defmodule QaAppWeb.AudienceLive.Show do
     {:noreply,
      socket
      |> assign(:user_question, user_question)
-     |> questions_stream()}
+     |> update_question_stream(question)}
   end
 
   def handle_info({:room_settings_updated, room}, socket) do
@@ -165,17 +165,55 @@ defmodule QaAppWeb.AudienceLive.Show do
     do: user_question && user_question.id == question.id
 
   defp questions_stream(socket) do
-    socket.assigns.room.id
-    |> Engagement.list_active_questions()
-    |> Enum.with_index(1)
-    |> then(fn entries ->
-      socket
-      |> assign(:questions_count, length(entries))
-      |> stream(:questions, entries,
-        dom_id: fn {question, _index} -> "q-" <> question.id end,
-        reset: true
-      )
-    end)
+    entries =
+      socket.assigns.room.id
+      |> Engagement.list_active_questions()
+      |> Enum.with_index(1)
+
+    socket
+    |> assign(:questions_count, length(entries))
+    |> assign(:question_entries, entries)
+    |> stream(:questions, entries,
+      dom_id: fn {question, _index} -> "q-" <> question.id end,
+      reset: true
+    )
+  end
+
+  # Votes are broadcast to every connected visitor, so re-querying the whole
+  # feed here would mean one database query per viewer per vote. Instead, patch
+  # only the row that changed using the question carried by the broadcast.
+  defp update_question_stream(socket, question) do
+    entries = socket.assigns.question_entries
+
+    cond do
+      question.is_asked ->
+        entries = Enum.reject(entries, fn {entry, _index} -> entry.id == question.id end)
+
+        socket
+        |> assign(:questions_count, length(entries))
+        |> assign(:question_entries, entries)
+        |> stream_delete(:questions, {question, nil})
+
+      index = Enum.find_value(entries, fn {entry, index} -> entry.id == question.id && index end) ->
+        entries =
+          Enum.map(entries, fn
+            {entry, entry_index} when entry.id == question.id -> {question, entry_index}
+            other -> other
+          end)
+
+        socket
+        |> assign(:question_entries, entries)
+        |> stream_insert(:questions, {question, index})
+
+      true ->
+        index = length(entries) + 1
+        entries = entries ++ [{question, index}]
+
+        socket
+        |> assign(:questions_count, length(entries))
+        |> assign(:question_entries, entries)
+        |> stream_insert(:questions, {question, index})
+    end
   end
 
   def render(assigns) do

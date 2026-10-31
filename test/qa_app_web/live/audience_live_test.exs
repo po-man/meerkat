@@ -272,6 +272,40 @@ defmodule QaAppWeb.AudienceLiveTest do
       assert has_element?(view, "#your-question-#{question.id}")
       refute has_element?(view, ~s(#q-#{question.id} button[phx-click="toggle_vote"]))
     end
+
+    test "another visitor's vote updates the feed row in place", %{conn: conn, room: room} do
+      {:ok, question} =
+        Engagement.create_question(room, "session-author", %{"content" => "Vote on me"})
+
+      {:ok, view, _html} = open_as(conn, room.slug, "viewer-session")
+
+      assert view
+             |> element(~s(#q-#{question.id} button span.tabular-nums))
+             |> render() =~ "0"
+
+      {:ok, _} = Engagement.toggle_vote(room.id, question.id, "another-voter")
+
+      assert_eventually(fn ->
+        view
+        |> element(~s(#q-#{question.id} button span.tabular-nums))
+        |> render() =~ "1"
+      end)
+    end
+
+    test "an asked question is removed from the audience feed", %{conn: conn, room: room} do
+      {:ok, question} =
+        Engagement.create_question(room, "session-author", %{"content" => "Will be asked"})
+
+      {:ok, view, _html} = open_as(conn, room.slug, "viewer-session")
+
+      assert has_element?(view, "#questions-feed #q-#{question.id}")
+
+      {:ok, _} = Engagement.mark_as_asked(question)
+
+      assert_eventually(fn ->
+        not has_element?(view, "#questions-feed #q-#{question.id}")
+      end)
+    end
   end
 
   defp assert_eventually(fun, timeout \\ 2_000) do
