@@ -95,7 +95,7 @@ defmodule QaAppWeb.ModeratorLive.Settings do
 
         <!-- Masthead -->
         <header class="border-b border-line pb-8">
-          <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+          <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
               <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
                 <span class="w-2 h-2 bg-accent"></span>
