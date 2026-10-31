@@ -35,8 +35,8 @@ fi
 
 bold "Machine"
 case "$(uname -m)" in
-  aarch64 | arm64) echo "  arm64 — matches the published image" ;;
-  x86_64) echo "  x86_64 — the published image is linux/arm64; use an A1 instance or change platforms in .github/workflows" ;;
+  x86_64 | amd64) echo "  x86_64 — matches the published image (GCP e2-micro)" ;;
+  aarch64 | arm64) echo "  arm64 — the published image is linux/amd64; to run here, set platforms: linux/arm64 and runs-on: ubuntu-24.04-arm in both workflows" ;;
   *) echo "  unexpected architecture: $(uname -m)" ;;
 esac
 

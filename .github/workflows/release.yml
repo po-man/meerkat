@@ -37,7 +37,7 @@ permissions:
 jobs:
   verify:
     name: verify tag
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       image_tag: ${{ steps.tag.outputs.image_tag }}
@@ -89,7 +89,7 @@ jobs:
     # rebuilding from the current main would overwrite an older tag with new code.
     # A dry run does build, but only under a scratch tag (see "Resolve tags").
     if: github.event_name != 'workflow_dispatch' || inputs.dry_run == true
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -125,7 +125,9 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/arm64
+          # Matches the deployment target (GCP e2-micro is x86_64).
+          # For an arm64 host (Oracle A1), use ubuntu-24.04-arm + linux/arm64.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.tags.outputs.tags }}
           labels: |
@@ -144,7 +146,7 @@ jobs:
       && inputs.dry_run != true
       && needs.verify.result == 'success'
       && (needs.build-push.result == 'success' || needs.build-push.result == 'skipped')
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: production
     steps:

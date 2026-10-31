@@ -22,7 +22,7 @@ permissions:
 jobs:
   test:
     name: mix precommit
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     env:
       MIX_ENV: test
     steps:
@@ -60,7 +60,7 @@ jobs:
 
   docker:
     name: docker build
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     # Releases build (and push) the image themselves, so they pass
     # `build_docker: false`. For push/pull_request `inputs` is empty, and the
     # comparison with `false` keeps the job enabled.
@@ -74,7 +74,9 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/arm64
+          # Matches the deployment target (GCP e2-micro is x86_64).
+          # For an arm64 host (Oracle A1), use ubuntu-24.04-arm + linux/arm64.
+          platforms: linux/amd64
           push: false
           cache-from: type=gha,scope=meerkat
           cache-to: type=gha,mode=max,scope=meerkat
