@@ -273,6 +273,47 @@ defmodule QaAppWeb.AudienceLiveTest do
       refute has_element?(view, ~s(#q-#{question.id} button[phx-click="toggle_vote"]))
     end
 
+    test "renders the feed sorted by votes on first load", %{conn: conn, room: room} do
+      {:ok, low} =
+        Engagement.create_question(room, "session-low", %{"content" => "Least votes"})
+
+      {:ok, high} =
+        Engagement.create_question(room, "session-high", %{"content" => "Most votes"})
+
+      {:ok, _} = Engagement.toggle_vote(room.id, low.id, "voter-1")
+      {:ok, _} = Engagement.toggle_vote(room.id, high.id, "voter-1")
+      {:ok, _} = Engagement.toggle_vote(room.id, high.id, "voter-2")
+
+      {:ok, view, _html} = open_as(conn, room.slug, "viewer-session")
+
+      ids = feed_ids(view)
+      assert Enum.take(ids, 2) == ["q-#{high.id}", "q-#{low.id}"]
+    end
+
+    test "re-sorts the feed when another visitor's vote changes the order", %{
+      conn: conn,
+      room: room
+    } do
+      {:ok, first} =
+        Engagement.create_question(room, "session-first", %{"content" => "First submitted"})
+
+      {:ok, second} =
+        Engagement.create_question(room, "session-second", %{"content" => "Second submitted"})
+
+      {:ok, _} = Engagement.toggle_vote(room.id, second.id, "voter-1")
+
+      {:ok, view, _html} = open_as(conn, room.slug, "viewer-session")
+
+      assert before?(feed_ids(view), "q-#{second.id}", "q-#{first.id}")
+      {:ok, _} = Engagement.toggle_vote(room.id, first.id, "voter-1")
+      {:ok, _} = Engagement.toggle_vote(room.id, first.id, "voter-2")
+
+      assert_eventually(fn ->
+        ids = feed_ids(view)
+        before?(ids, "q-#{first.id}", "q-#{second.id}")
+      end)
+    end
+
     test "another visitor's vote updates the feed row in place", %{conn: conn, room: room} do
       {:ok, question} =
         Engagement.create_question(room, "session-author", %{"content" => "Vote on me"})
@@ -306,6 +347,19 @@ defmodule QaAppWeb.AudienceLiveTest do
         not has_element?(view, "#questions-feed #q-#{question.id}")
       end)
     end
+  end
+
+  defp feed_ids(view) do
+    view
+    |> element("#questions-feed")
+    |> render()
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.query("div[id^='q-']")
+    |> LazyHTML.attribute("id")
+  end
+
+  defp before?(ids, first_id, second_id) do
+    Enum.find_index(ids, &(&1 == first_id)) < Enum.find_index(ids, &(&1 == second_id))
   end
 
   defp assert_eventually(fun, timeout \\ 2_000) do
