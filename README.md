@@ -44,3 +44,9 @@ mix phx.server
 ```
 
 Open [`localhost:4000`](http://localhost:4000). On first run, go to [`/login`](http://localhost:4000/login) to create the admin account using the access code from your `.env`, then create moderators and rooms from the admin dashboard.
+
+## Deploy
+
+Production runs as a single Docker image behind a Cloudflare Tunnel. See
+[`docs/DEPLOY.md`](docs/DEPLOY.md) for the host setup, release process, backups
+and rollback.
