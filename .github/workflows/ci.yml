@@ -6,6 +6,11 @@ on:
   pull_request:
   # Reused by the release workflow so a tag can never ship untested code.
   workflow_call:
+    inputs:
+      build_docker:
+        description: Build the Docker image as part of CI
+        type: boolean
+        default: true
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -56,8 +61,10 @@ jobs:
   docker:
     name: docker build
     runs-on: ubuntu-24.04-arm
-    # Releases build (and push) the image themselves, so skip it when called.
-    if: github.event_name != 'workflow_call'
+    # Releases build (and push) the image themselves, so they pass
+    # `build_docker: false`. For push/pull_request `inputs` is empty, and the
+    # comparison with `false` keeps the job enabled.
+    if: inputs.build_docker != false
     steps:
       - uses: actions/checkout@v4
 
