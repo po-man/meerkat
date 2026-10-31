@@ -17,10 +17,10 @@ beyond one replica.**
 
 ## Prerequisites
 
-- A host: Oracle Cloud Always Free `VM.Standard.A1.Flex` (2 OCPU / 12 GB, Ubuntu
-  24.04 aarch64) is the intended target — see [ORACLE.md](ORACLE.md) for the
-  console walkthrough. `VM.Standard.E2.1.Micro` (amd64, 1 GB) also works if you
-  change the build platform.
+- A host: Google Cloud **Always Free e2-micro** (Ubuntu 24.04, `us-central1`) is
+  the current target — see [GCP.md](GCP.md) for the console walkthrough. Oracle
+  Cloud `VM.Standard.A1.Flex` also works if you rebuild for arm64; see
+  [ORACLE.md](ORACLE.md).
 - A domain hosted on Cloudflare (free plan is enough).
 - An R2 bucket (10 GB free) with an `rclone` remote named `r2`.
 
@@ -28,14 +28,17 @@ beyond one replica.**
 
 ### 1. Create the VM
 
-Follow [ORACLE.md](ORACLE.md): VCN, security list (SSH from your IP only, no
-80/443), the A1 instance, and the deploy key. Everything below happens over SSH
-on that host.
+Follow [GCP.md](GCP.md): project, budget alert, firewall rule (SSH from your IP
+only, no 80/443), the e2-micro instance, and the deploy user. Everything below
+happens over SSH on that host.
+
+> On GCP the SSH user is **your own username**, not `ubuntu` — run `whoami` on
+> the host and use that for `DEPLOY_USER` and for the `chown` below.
 
 ### 2. Clone and bootstrap
 
 ```bash
-sudo mkdir -p /srv && sudo chown ubuntu:ubuntu /srv
+sudo mkdir -p /srv && sudo chown "$USER:$USER" /srv
 git clone git@github.com:po-man/meerkat.git /srv/meerkat
 cd /srv/meerkat
 sudo bash deploy/bootstrap.sh
@@ -168,7 +171,7 @@ Repository secrets (Settings → Secrets and variables → Actions):
 | Secret | Value |
 |--------|-------|
 | `DEPLOY_HOST` | Public IP or hostname of the VM. |
-| `DEPLOY_USER` | SSH user (member of the `docker` group). |
+| `DEPLOY_USER` | SSH user (member of the `docker` group). On GCP this is **your own username** (`whoami` on the host), on Oracle it is `ubuntu`. |
 | `DEPLOY_SSH_KEY` | Private key for that user (paste the whole key, including header/footer). |
 
 Two host-side requirements the pipeline depends on:

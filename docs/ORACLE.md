@@ -1,5 +1,11 @@
 # Oracle Cloud setup (Always Free)
 
+> This is the **alternative** provider. The current target is GCP e2-micro
+> ([GCP.md](GCP.md)), which is x86_64. Moving to Oracle A1 requires rebuilding
+> the image for arm64: set `platforms: linux/arm64` and
+> `runs-on: ubuntu-24.04-arm` in `.github/workflows/ci.yml` and
+> `release.yml`. Nothing else in the repo is architecture-specific.
+
 One-time, console-side setup for the host that runs Meerkat. Budget 30–60
 minutes, most of it waiting for the instance to boot.
 
