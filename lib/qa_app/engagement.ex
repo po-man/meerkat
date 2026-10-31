@@ -5,18 +5,23 @@ defmodule QaApp.Engagement do
 
   import Ecto.Query, warn: false
   alias QaApp.Repo
-  alias QaApp.Engagement.{Question, Vote}
+  alias QaApp.Engagement.{Question, Vote, VoteStore}
+  alias QaApp.Events
   alias QaApp.Events.Room
 
   def list_active_questions(room_id) do
+    flush_votes(room_id)
     list_questions_by_asked(room_id, false)
   end
 
   def list_asked_questions(room_id) do
+    flush_votes(room_id)
     list_questions_by_asked(room_id, true)
   end
 
   def list_all_questions(room_id) do
+    flush_votes(room_id)
+
     Question
     |> where([q], q.room_id == ^room_id)
     |> order_by([q], desc: q.vote_count, desc: q.inserted_at)
@@ -31,6 +36,8 @@ defmodule QaApp.Engagement do
   end
 
   def get_question_by_session(room_id, session_id) do
+    flush_votes(room_id)
+
     Question
     |> Repo.get_by(room_id: room_id, session_id: session_id)
   end
@@ -51,6 +58,7 @@ defmodule QaApp.Engagement do
     |> Repo.insert()
     |> case do
       {:ok, question} ->
+        VoteStore.put_question(room.id, question)
         broadcast_question_created(question)
         {:ok, question}
 
@@ -85,6 +93,7 @@ defmodule QaApp.Engagement do
     |> Repo.update()
     |> case do
       {:ok, updated_question} ->
+        VoteStore.put_question(updated_question.room_id, updated_question)
         broadcast_question_updated(updated_question)
         {:ok, updated_question}
 
@@ -93,73 +102,30 @@ defmodule QaApp.Engagement do
     end
   end
 
+  @doc """
+  Toggles a visitor's vote on a question.
+
+  Votes are applied in memory by `QaApp.Engagement.VoteStore` and persisted in
+  batches, so a click never waits on SQLite's single write lock.
+  """
   def toggle_vote(room_id, question_id, session_id) do
-    # SQLite only allows one writer at a time. Starting the transaction in
-    # `:immediate` mode takes the write lock before the read, so concurrent
-    # votes wait on `busy_timeout` instead of failing to upgrade a deferred
-    # read transaction with `Exqlite.Error: Database busy`. Reading the
-    # question inside the transaction also prevents lost vote increments.
-    result =
-      Repo.transaction(
-        fn ->
-          case Repo.get(Question, question_id) do
-            nil ->
-              Repo.rollback(:question_not_found)
-
-            question ->
-              cond do
-                question.room_id != room_id ->
-                  # Never allow voting on a question from another room.
-                  Repo.rollback(:invalid_room)
-
-                question.session_id == session_id ->
-                  Repo.rollback(:cannot_vote_own_question)
-
-                true ->
-                  do_toggle_vote(question, question_id, session_id)
-              end
-          end
-        end,
-        mode: :immediate
-      )
-
-    case result do
-      {:ok, {direction, updated_question}} ->
-        broadcast_question_updated(updated_question)
-        {:ok, {direction, updated_question}}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
+    VoteStore.toggle(room_id, question_id, session_id)
   end
 
-  defp do_toggle_vote(question, question_id, session_id) do
-    case Repo.get_by(Vote, question_id: question_id, session_id: session_id) do
-      %Vote{} = existing_vote ->
-        Repo.delete!(existing_vote)
+  @doc """
+  Returns the ids of the questions `session_id` has voted on in the room.
 
-        updated_question =
-          question
-          |> Ecto.Changeset.change(vote_count: max(0, question.vote_count - 1))
-          |> Repo.update!()
-
-        {:unvoted, updated_question}
-
-      nil ->
-        %Vote{}
-        |> Vote.changeset(%{question_id: question_id, session_id: session_id})
-        |> Repo.insert!()
-
-        updated_question =
-          question
-          |> Ecto.Changeset.change(vote_count: question.vote_count + 1)
-          |> Repo.update!()
-
-        {:voted, updated_question}
-    end
-  end
-
+  Pending in-memory votes win over the database, so a visitor who toggles a
+  vote and immediately refreshes still sees the correct button state.
+  """
   def list_user_voted_question_ids(room_id, session_id) do
+    case VoteStore.user_voted_ids(room_id, session_id) do
+      {:ok, ids} -> ids
+      :error -> load_user_voted_question_ids(room_id, session_id)
+    end
+  end
+
+  defp load_user_voted_question_ids(room_id, session_id) do
     Vote
     |> join(:inner, [v], q in assoc(v, :question))
     |> where([v, q], q.room_id == ^room_id and v.session_id == ^session_id)
@@ -171,7 +137,7 @@ defmodule QaApp.Engagement do
   def broadcast_question_created(%Question{} = question) do
     Phoenix.PubSub.broadcast(
       QaApp.PubSub,
-      "room:#{question.room_id}",
+      Events.room_topic(question.room_id),
       {:question_created, question}
     )
   end
@@ -179,8 +145,12 @@ defmodule QaApp.Engagement do
   def broadcast_question_updated(%Question{} = question) do
     Phoenix.PubSub.broadcast(
       QaApp.PubSub,
-      "room:#{question.room_id}",
+      Events.room_topic(question.room_id),
       {:question_updated, question}
     )
   end
+
+  # Reads must not observe stale vote counts while deltas are still buffered.
+  # Flushing is a no-op once the room is clean, so this is cheap.
+  defp flush_votes(room_id), do: VoteStore.flush(room_id)
 end

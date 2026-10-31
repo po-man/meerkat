@@ -4,7 +4,14 @@ defmodule QaAppWeb.AdminLive.Index do
   alias QaApp.Events
   alias QaApp.Events.Room
   alias QaApp.Accounts
+  alias QaApp.Presence
   alias QaApp.RoomCapacity
+
+  require Logger
+
+  # Presence diffs arrive per join/leave. A hall filling up would otherwise
+  # re-query every room and re-stream the whole table once per diff.
+  @presence_debounce 250
 
   def mount(_params, _session, socket) do
     users = Accounts.list_users()
@@ -30,6 +37,7 @@ defmodule QaAppWeb.AdminLive.Index do
      |> assign(:confirm_deactivate_room, nil)
      |> assign(:confirm_delete_room, nil)
      |> assign(:show_configure_room_modal?, false)
+     |> assign(:presence_timer, nil)
      |> assign(:moderator_form, to_form(Accounts.change_moderator(), as: :moderator))}
   end
 
@@ -42,18 +50,21 @@ defmodule QaAppWeb.AdminLive.Index do
   # The counts are rendered inside streamed table rows, and LiveView only
   # morphs streamed children when the collection itself is re-streamed — an
   # outer assign change alone does not update the rows in the browser. So we
-  # recompute the counts and re-stream the rooms together.
-  def handle_info(
-        %Phoenix.Socket.Broadcast{event: "presence_diff", topic: "room:" <> _room_id},
-        socket
-      ) do
-    {:noreply, stream_rooms(socket)}
+  # recompute the counts and re-stream the rooms together, coalescing bursts
+  # of presence diffs into one refresh per debounce window.
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    {:noreply, schedule_rooms_refresh(socket)}
   end
 
-  # The admin is subscribed to the room topics for presence diffs, so it also
-  # sees the app's plain broadcasts; these are already reflected via the rooms
-  # list and are otherwise irrelevant here.
-  def handle_info({:room_settings_updated, _room}, socket), do: {:noreply, socket}
+  def handle_info(:refresh_rooms, socket) do
+    {:noreply,
+     socket
+     |> assign(:presence_timer, nil)
+     |> stream_rooms()}
+  end
+
+  # The admin is subscribed to each room's presence topic, so it also sees
+  # visitor expulsions; those do not change the room list itself.
   def handle_info({:room_visitors_expelled, _session_ids}, socket), do: {:noreply, socket}
 
   # A room's settings changed from another view (moderator dashboard, settings
@@ -66,6 +77,13 @@ defmodule QaAppWeb.AdminLive.Index do
      |> assign(:confirm_deactivate_room, nil)
      |> assign(:confirm_delete_room, nil)
      |> stream_rooms()}
+  end
+
+  # Defensive: a housekeeping page must never crash because a new broadcast
+  # was added to a topic it subscribes to.
+  def handle_info(message, socket) do
+    Logger.debug("Ignoring unexpected message on #{inspect(__MODULE__)}: #{inspect(message)}")
+    {:noreply, socket}
   end
 
   def handle_event("open_create_room", _, socket) do
@@ -734,11 +752,18 @@ defmodule QaAppWeb.AdminLive.Index do
     |> stream(:rooms, rooms, dom_id: &("room-" <> &1.id), reset: true)
   end
 
+  defp schedule_rooms_refresh(%{assigns: %{presence_timer: nil}} = socket) do
+    timer = Process.send_after(self(), :refresh_rooms, @presence_debounce)
+    assign(socket, :presence_timer, timer)
+  end
+
+  defp schedule_rooms_refresh(socket), do: socket
+
   # Keeps the admin LiveView subscribed to each room's presence topic so live
   # visitor counts stay in sync, subscribing to new rooms and unsubscribing
   # from removed/deleted ones.
   defp sync_presence_subscriptions(socket, rooms) do
-    new_topics = MapSet.new(rooms, fn room -> "room:#{room.id}" end)
+    new_topics = MapSet.new(rooms, fn room -> Presence.topic(room) end)
     old_topics = Map.get(socket.assigns, :presence_topics, MapSet.new())
 
     new_topics

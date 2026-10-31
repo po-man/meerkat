@@ -13,4 +13,11 @@ defmodule QaAppWeb.PageControllerTest do
     refute html =~ QaAppWeb.AdminAuth.secret_path()
     refute html =~ "Admin Login"
   end
+
+  test "answers the Chrome DevTools probe with 204", %{conn: conn} do
+    conn = get(conn, "/.well-known/appspecific/com.chrome.devtools.json")
+
+    assert conn.status == 204
+    assert conn.resp_body == ""
+  end
 end

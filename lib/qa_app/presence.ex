@@ -5,10 +5,13 @@ defmodule QaApp.Presence do
   Only anonymous visitors are tracked, keyed by their `session_id`. Admin and
   moderator sessions are never tracked, so they are never counted as visitors.
 
-  LiveViews already subscribed to a room's PubSub topic (via
-  `QaApp.Events.subscribe_room/1`) automatically receive a
+  LiveViews already subscribed to a room's presence topic (via
+  `QaApp.Events.subscribe_room_presence/1`) automatically receive a
   `%Phoenix.Socket.Broadcast{event: "presence_diff", ...}` message whenever the
   visitor presence changes, and can recompute `count/1` from it.
+
+  Presence uses its own topic (separate from the question feed) so that views
+  which only care about visitor counts never receive question or vote events.
   """
 
   use Phoenix.Presence,
@@ -21,7 +24,7 @@ defmodule QaApp.Presence do
 
   @doc "The presence topic used to track visitors of a room."
   def topic(%Room{id: room_id}), do: topic(room_id)
-  def topic(room_id) when is_binary(room_id), do: "room:#{room_id}"
+  def topic(room_id) when is_binary(room_id), do: "room:#{room_id}:presence"
 
   @doc """
   Tracks the calling (LiveView) process as a visitor of the room, keyed by the

@@ -79,11 +79,30 @@ defmodule QaAppWeb.AudienceLiveTest do
 
       Phoenix.PubSub.broadcast(
         QaApp.PubSub,
-        "room:#{room.id}",
+        QaApp.Presence.topic(room.id),
         {:room_visitors_expelled, ["session-me"]}
       )
 
       assert_redirect(view, "/r/#{room.slug}/full")
+    end
+
+    test "coalesces a burst of joins into the correct visitor count", %{
+      conn: conn,
+      room: room
+    } do
+      {:ok, view, _html} =
+        conn
+        |> Plug.Test.init_test_session(%{"session_id" => "watcher-1"})
+        |> live("/r/#{room.slug}")
+
+      {:ok, _second_view, _html} =
+        Phoenix.ConnTest.build_conn()
+        |> Plug.Test.init_test_session(%{"session_id" => "watcher-2"})
+        |> live("/r/#{room.slug}")
+
+      assert_eventually(fn ->
+        view |> element("#visitor-count") |> render() =~ "2"
+      end)
     end
   end
 
@@ -223,6 +242,37 @@ defmodule QaAppWeb.AudienceLiveTest do
       assert has_element?(view, ~s(#q-#{vote_question.id} button.bg-ink))
     end
 
+    test "clicking an upvote a second time clears the selection", %{conn: conn, room: room} do
+      {:ok, vote_question} =
+        Engagement.create_question(room, "voter-session", %{"content" => "Toggle me twice"})
+
+      {:ok, view, _html} = open_as(conn, room.slug, "current-session")
+
+      button = ~s(#q-#{vote_question.id} button[phx-click="toggle_vote"])
+
+      view |> element(button) |> render_click()
+      assert has_element?(view, ~s(#q-#{vote_question.id} button.bg-ink))
+
+      view |> element(button) |> render_click()
+      refute has_element?(view, ~s(#q-#{vote_question.id} button.bg-ink))
+    end
+
+    test "another visitor's new question is inserted into the live feed", %{
+      conn: conn,
+      room: room
+    } do
+      {:ok, view, _html} = open_as(conn, room.slug, "viewer-session")
+
+      {:ok, question} =
+        Engagement.create_question(room, "another-visitor", %{"content" => "Arrived live"})
+
+      assert_eventually(fn ->
+        has_element?(view, "#questions-feed #q-#{question.id}")
+      end)
+
+      assert view |> element("#q-#{question.id}") |> render() =~ "Arrived live"
+    end
+
     test "shows the Raised status and upvote count beside the submitted question", %{
       conn: conn,
       room: room
@@ -241,6 +291,24 @@ defmodule QaAppWeb.AudienceLiveTest do
       assert view |> element("#user-question-status") |> render() =~ "Raised"
       assert view |> element("#user-question-vote-count") |> render() =~ "2"
       assert view |> element("#user-question-vote-count") |> render() =~ "upvotes"
+    end
+
+    test "updates the submitted question's vote count when others vote", %{
+      conn: conn,
+      room: room
+    } do
+      {:ok, question} =
+        Engagement.create_question(room, "session-me", %{"content" => "My question"})
+
+      {:ok, view, _html} = open_as(conn, room.slug, "session-me")
+
+      assert view |> element("#user-question-vote-count") |> render() =~ "0"
+
+      {:ok, _} = Engagement.toggle_vote(room.id, question.id, "other-voter")
+
+      assert_eventually(fn ->
+        view |> element("#user-question-vote-count") |> render() =~ "1"
+      end)
     end
 
     test "updates the status to Asked when a moderator marks the question as asked", %{

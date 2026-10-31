@@ -18,6 +18,10 @@ defmodule QaAppWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Chrome (with DevTools open) probes this on every page load. Answering with
+  # 204 avoids a NoRouteError and its dev stacktrace without exposing anything.
+  get "/.well-known/appspecific/com.chrome.devtools.json", QaAppWeb.PageController, :devtools
+
   scope "/", QaAppWeb do
     pipe_through :browser
 

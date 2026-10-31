@@ -5,6 +5,10 @@ defmodule QaAppWeb.AudienceLive.Show do
   alias QaApp.Engagement
   alias QaApp.RoomCapacity
 
+  # Presence diffs are coalesced into at most one recount per viewer per
+  # window, so a room filling up does not multiply work by the visitor count.
+  @visitor_count_debounce 250
+
   def mount(%{"slug" => slug}, _session, socket) do
     case Events.get_room_by_slug(slug) do
       nil ->
@@ -26,6 +30,8 @@ defmodule QaAppWeb.AudienceLive.Show do
           :ok ->
             if connected?(socket) do
               Events.subscribe_room(room.id)
+              Events.subscribe_room_presence(room.id)
+              Events.subscribe_room_settings(room.id)
             end
 
             visitor_count = RoomCapacity.count(room.id)
@@ -49,6 +55,7 @@ defmodule QaAppWeb.AudienceLive.Show do
              |> assign(:user_question, user_question)
              |> assign(:form, form)
              |> assign(:char_count, 0)
+             |> assign(:visitor_count_timer, nil)
              |> assign(:submitted?, not is_nil(user_question))}
         end
     end
@@ -100,13 +107,21 @@ defmodule QaAppWeb.AudienceLive.Show do
     room = socket.assigns.room
 
     case Engagement.toggle_vote(room.id, question_id, session_id) do
-      {:ok, _res} ->
-        user_voted_ids = Engagement.list_user_voted_question_ids(room.id, session_id)
-
+      {:ok, {direction, question}} ->
+        # The vote store buffers the vote in memory and broadcasts the new
+        # counts in batches, so this click costs no database round trip. Keep
+        # this visitor's own selection in sync locally.
+        #
+        # The button lives inside a streamed row, so the row must be re-streamed
+        # for the selection to render immediately; an assign change alone does
+        # not re-render stream children.
         {:noreply,
          socket
-         |> assign(:user_voted_ids, user_voted_ids)
-         |> questions_stream()}
+         |> assign(
+           :user_voted_ids,
+           put_user_vote(socket.assigns.user_voted_ids, question_id, direction)
+         )
+         |> update_question_stream(question)}
 
       {:error, :cannot_vote_own_question} ->
         {:noreply, put_flash(socket, :error, "You cannot upvote your own question.")}
@@ -116,12 +131,21 @@ defmodule QaAppWeb.AudienceLive.Show do
     end
   end
 
-  def handle_info({:question_created, _question}, socket) do
-    {:noreply, questions_stream(socket)}
+  def handle_info({:question_created, question}, socket) do
+    # The broadcast already carries the whole question, so insert it into the
+    # local feed instead of re-querying it once per connected viewer.
+    {:noreply, insert_question_stream(socket, question)}
   end
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
-    {:noreply, assign(socket, :visitor_count, RoomCapacity.count(socket.assigns.room.id))}
+    {:noreply, schedule_visitor_count_refresh(socket)}
+  end
+
+  def handle_info(:refresh_visitor_count, socket) do
+    {:noreply,
+     socket
+     |> assign(:visitor_count, RoomCapacity.count(socket.assigns.room.id))
+     |> assign(:visitor_count_timer, nil)}
   end
 
   def handle_info({:room_visitors_expelled, session_ids}, socket) do
@@ -147,6 +171,10 @@ defmodule QaAppWeb.AudienceLive.Show do
      socket
      |> assign(:user_question, user_question)
      |> update_question_stream(question)}
+  end
+
+  def handle_info({:questions_updated, questions}, socket) do
+    {:noreply, apply_questions_updated(socket, questions)}
   end
 
   def handle_info({:room_settings_updated, room}, socket) do
@@ -212,6 +240,100 @@ defmodule QaAppWeb.AudienceLive.Show do
       end
     end
   end
+
+  # A coalesced batch of vote changes from the vote store. Apply them all
+  # before touching the stream, so a burst of votes costs at most one re-sort
+  # and one stream reset per viewer.
+  defp apply_questions_updated(socket, questions) do
+    entries = socket.assigns.question_entries
+    by_id = Map.new(questions, &{&1.id, &1})
+
+    updated =
+      entries
+      |> Enum.map(fn {question, _index} -> {Map.get(by_id, question.id, question), nil} end)
+      |> Enum.reject(fn {question, _index} -> question.is_asked end)
+
+    present_ids = MapSet.new(updated, fn {question, _index} -> question.id end)
+
+    additions =
+      for {id, question} <- by_id,
+          not question.is_asked,
+          not MapSet.member?(present_ids, id),
+          do: {question, nil}
+
+    new_entries = sort_question_entries(updated ++ additions)
+
+    socket =
+      assign(
+        socket,
+        :user_question,
+        updated_user_question(socket.assigns.user_question, by_id)
+      )
+
+    if question_ids(entries) == question_ids(new_entries) do
+      changed_ids = MapSet.new(questions, & &1.id)
+
+      socket
+      |> assign(:questions_count, length(new_entries))
+      |> assign(:question_entries, new_entries)
+      |> then(fn socket ->
+        Enum.reduce(new_entries, socket, fn {question, _index} = entry, socket ->
+          if MapSet.member?(changed_ids, question.id) do
+            stream_insert(socket, :questions, entry)
+          else
+            socket
+          end
+        end)
+      end)
+    else
+      put_questions_stream(socket, new_entries)
+    end
+  end
+
+  defp updated_user_question(nil, _by_id), do: nil
+
+  defp updated_user_question(%{id: id} = question, by_id) do
+    Map.get(by_id, id, question)
+  end
+
+  # A newly created question has the lowest possible vote count and the newest
+  # timestamp, so the vote-ordered feed almost always appends it at the end.
+  # Patch that row in instead of resetting (or re-querying) the whole feed for
+  # every connected viewer.
+  defp insert_question_stream(socket, question) do
+    entries = socket.assigns.question_entries
+
+    if Enum.any?(entries, fn {entry, _index} -> entry.id == question.id end) do
+      update_question_stream(socket, question)
+    else
+      new_entries = sort_question_entries(entries ++ [{question, nil}])
+
+      if question_ids(new_entries) == question_ids(entries) ++ [question.id] do
+        {inserted, index} =
+          Enum.find(new_entries, fn {entry, _index} -> entry.id == question.id end)
+
+        socket
+        |> assign(:questions_count, length(new_entries))
+        |> assign(:question_entries, new_entries)
+        |> stream_insert(:questions, {inserted, index})
+      else
+        put_questions_stream(socket, new_entries)
+      end
+    end
+  end
+
+  defp put_user_vote(ids, question_id, :voted), do: MapSet.put(ids, question_id)
+  defp put_user_vote(ids, question_id, :unvoted), do: MapSet.delete(ids, question_id)
+
+  # Joins and leaves arrive in bursts (e.g. a hall filling up), and every
+  # viewer subscribed to the room receives each diff. Coalesce them into one
+  # presence recount per debounce window instead of one per diff.
+  defp schedule_visitor_count_refresh(%{assigns: %{visitor_count_timer: nil}} = socket) do
+    timer = Process.send_after(self(), :refresh_visitor_count, @visitor_count_debounce)
+    assign(socket, :visitor_count_timer, timer)
+  end
+
+  defp schedule_visitor_count_refresh(socket), do: socket
 
   # Mirrors the SQL order used by `Engagement.list_active_questions/1`: most
   # votes first, then most recently submitted first. `Enum.sort_by/3` compares

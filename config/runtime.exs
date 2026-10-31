@@ -61,7 +61,10 @@ if config_env() == :dev do
   # Reload browser tabs when matching files change.
   config :qa_app, QaAppWeb.Endpoint,
     live_reload: [
-      web_console_logger: true,
+      # Streaming server logs to the browser forwards every log line to every
+      # connected tab, which can dominate a multi-client load test. Opt in with
+      # `LIVE_RELOAD_LOGS=1 mix phx.server`.
+      web_console_logger: System.get_env("LIVE_RELOAD_LOGS") == "1",
       patterns: [
         # Static assets, except user uploads
         ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$"E,

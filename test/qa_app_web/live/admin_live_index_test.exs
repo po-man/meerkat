@@ -4,6 +4,7 @@ defmodule QaAppWeb.AdminLiveIndexTest do
   import Phoenix.LiveViewTest
 
   alias QaApp.Accounts
+  alias QaApp.Engagement
   alias QaApp.Events
   alias QaAppWeb.AdminAuth
 
@@ -221,6 +222,30 @@ defmodule QaAppWeb.AdminLiveIndexTest do
       # streamed column live, without any reload from the admin side.
       assert_eventually(fn -> view |> element("#room-live-#{room.id}") |> render() =~ "1" end)
       assert_eventually(fn -> render(view) =~ "1 live" end)
+    end
+  end
+
+  describe "question broadcasts" do
+    test "the admin page survives question and vote broadcasts", %{conn: conn} do
+      {:ok, room} =
+        Events.create_room(%{
+          "slug" => "admin-resilience-room",
+          "title" => "Admin Resilience Room",
+          "char_limit" => 320,
+          "is_active" => true
+        })
+
+      view = open_admin(conn)
+
+      # Question and vote broadcasts go to the feed topic, which the admin page
+      # does not subscribe to. It must stay mounted and responsive.
+      {:ok, question} =
+        Engagement.create_question(room, "question-author", %{"content" => "Live question"})
+
+      {:ok, _} = Engagement.toggle_vote(room.id, question.id, "voter-session")
+
+      assert has_element?(view, "#rooms-rows")
+      assert has_element?(view, "#total-live-visitors")
     end
   end
 

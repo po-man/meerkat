@@ -6,6 +6,7 @@ defmodule QaApp.Events do
   import Ecto.Query, warn: false
   alias QaApp.Repo
   alias QaApp.Events.Room
+  alias QaApp.Presence
   alias QaApp.RoomCapacity
   alias QaApp.RoomExpiryScheduler
 
@@ -74,7 +75,15 @@ defmodule QaApp.Events do
   end
 
   def delete_room(%Room{} = room) do
-    Repo.delete(room)
+    case Repo.delete(room) do
+      {:ok, _deleted_room} = ok ->
+        # The room's votes are gone with it; drop any buffered tally.
+        QaApp.Engagement.VoteStore.forget(room.id)
+        ok
+
+      error ->
+        error
+    end
   end
 
   def change_room(%Room{} = room, attrs \\ %{}) do
@@ -114,8 +123,30 @@ defmodule QaApp.Events do
     |> Repo.one()
   end
 
-  def subscribe_room(room_id) do
-    Phoenix.PubSub.subscribe(QaApp.PubSub, "room:#{room_id}")
+  @doc "The PubSub topic carrying a room's question feed (questions and votes)."
+  def room_topic(%Room{id: room_id}), do: room_topic(room_id)
+  def room_topic(room_id) when is_binary(room_id), do: "room:#{room_id}"
+
+  @doc "The PubSub topic carrying a room's settings changes."
+  def room_settings_topic(%Room{id: room_id}), do: room_settings_topic(room_id)
+  def room_settings_topic(room_id) when is_binary(room_id), do: "room:#{room_id}:settings"
+
+  @doc """
+  Subscribes to a room's question feed. Feed events are `{:question_created,
+  question}` and `{:question_updated, question}`.
+  """
+  def subscribe_room(room_or_id) do
+    Phoenix.PubSub.subscribe(QaApp.PubSub, room_topic(room_or_id))
+  end
+
+  @doc "Subscribes to a room's live visitor presence changes."
+  def subscribe_room_presence(room_or_id) do
+    Phoenix.PubSub.subscribe(QaApp.PubSub, Presence.topic(room_or_id))
+  end
+
+  @doc "Subscribes to a room's settings changes."
+  def subscribe_room_settings(room_or_id) do
+    Phoenix.PubSub.subscribe(QaApp.PubSub, room_settings_topic(room_or_id))
   end
 
   @doc """
@@ -126,7 +157,11 @@ defmodule QaApp.Events do
   end
 
   def broadcast_room_updated(%Room{} = room) do
-    Phoenix.PubSub.broadcast(QaApp.PubSub, "room:#{room.id}", {:room_settings_updated, room})
+    Phoenix.PubSub.broadcast(
+      QaApp.PubSub,
+      room_settings_topic(room),
+      {:room_settings_updated, room}
+    )
 
     # Also announce on the global rooms topic so open room listings (admin
     # control center and moderator dashboard) refresh their rows live when the
