@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Reused by the release workflow so a tag can never ship untested code.
+  workflow_call:
+    inputs:
+      build_docker:
+        description: Build the Docker image as part of CI
+        type: boolean
+        default: true
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: mix precommit
+    runs-on: ubuntu-24.04
+    env:
+      MIX_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir and Erlang
+        uses: erlef/setup-beam@v1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Cache deps and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.tool-versions') }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.tool-versions') }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Audit dependencies
+        run: mix hex.audit
+
+      - name: Compile, format check and test
+        run: mix precommit
+
+      # `mix precommit` formats and unlocks deps in place, so any change here
+      # means the branch is not clean: fail instead of silently fixing it.
+      - name: Verify precommit changed nothing
+        run: git diff --exit-code
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-24.04
+    # Releases build (and push) the image themselves, so they pass
+    # `build_docker: false`. For push/pull_request `inputs` is empty, and the
+    # comparison with `false` keeps the job enabled.
+    if: inputs.build_docker != false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # Matches the deployment target (GCP e2-micro is x86_64).
+          # For an arm64 host (Oracle A1), use ubuntu-24.04-arm + linux/arm64.
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=meerkat
+          cache-to: type=gha,mode=max,scope=meerkat

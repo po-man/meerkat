@@ -1,0 +1,184 @@
+name: Release
+
+# Tag a commit on main to ship it:
+#
+#   git tag release.2026.10.31.1 && git push origin release.2026.10.31.1
+#
+# To roll back, run this workflow manually (workflow_dispatch) with the
+# `image_tag` of a previously released build; the image is not rebuilt.
+#
+# To prove the pipeline without a host, dispatch with `dry_run`: the image is
+# still built and pushed under its release tag, but `:latest` is not moved and
+# nothing is deployed.
+
+on:
+  push:
+    tags:
+      - "release.*"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Existing image tag to deploy, e.g. release.2026.10.30.1
+        required: true
+        type: string
+      dry_run:
+        description: Build the image but do not deploy it
+        type: boolean
+        default: false
+
+# Never run two production deployments at once, and never cancel one midway.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag and origin
+        id: tag
+        env:
+          REQUESTED_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || github.ref_name }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -eu
+
+          if ! printf '%s' "$REQUESTED_TAG" | grep -Eq '^release\.[0-9]{4}\.[0-9]{2}\.[0-9]{2}\.[A-Za-z0-9._-]+$'; then
+            echo "::error::'$REQUESTED_TAG' does not match release.YYYY.MM.DD.X"
+            exit 1
+          fi
+
+          # Only commits already on main are deployable. For a manual rollback
+          # this checks the dispatched ref, which should be main too.
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_SHA is not an ancestor of main; tag releases from main"
+            exit 1
+          fi
+
+          echo "image_tag=$REQUESTED_TAG" >> "$GITHUB_OUTPUT"
+
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            echo "### Dry run: building \`$REQUESTED_TAG\` under a scratch tag, not deploying" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Deploying \`$REQUESTED_TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # Same job that runs on every PR: a tag can never ship untested code.
+  test:
+    name: test
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+    with:
+      build_docker: false
+
+  build-push:
+    name: build and push image
+    needs: [verify, test]
+    # A rollback deploys an image that already exists, so never rebuild it:
+    # rebuilding from the current main would overwrite an older tag with new code.
+    # A dry run does build, but only under a scratch tag (see "Resolve tags").
+    if: github.event_name != 'workflow_dispatch' || inputs.dry_run == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image tags
+        id: tags
+        env:
+          IMAGE_TAG: ${{ needs.verify.outputs.image_tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -eu
+
+          if [ "$DRY_RUN" = "true" ]; then
+            # Never touch a release tag or :latest on a dry run.
+            echo "tags=ghcr.io/po-man/meerkat:dry-run-$(printf '%.7s' "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=ghcr.io/po-man/meerkat:$IMAGE_TAG,ghcr.io/po-man/meerkat:latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # Matches the deployment target (GCP e2-micro is x86_64).
+          # For an arm64 host (Oracle A1), use ubuntu-24.04-arm + linux/arm64.
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/po-man/meerkat
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.verify.outputs.image_tag }}
+          cache-from: type=gha,scope=meerkat
+          cache-to: type=gha,mode=max,scope=meerkat
+
+  deploy:
+    name: deploy
+    needs: [verify, build-push]
+    # `build-push` is skipped on a manual rollback, so accept either outcome.
+    if: >-
+      always()
+      && inputs.dry_run != true
+      && needs.verify.result == 'success'
+      && (needs.build-push.result == 'success' || needs.build-push.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -eu
+            TAG="${{ needs.verify.outputs.image_tag }}"
+            cd /srv/meerkat
+
+            # Keep the checkout (compose file, deploy scripts) in sync with the
+            # image we are about to run.
+            git fetch --force --tags origin
+            git checkout --force "$TAG"
+
+            IMAGE_TAG="$TAG" docker compose -f compose.prod.yml pull web
+            IMAGE_TAG="$TAG" docker compose -f compose.prod.yml up -d --no-deps web
+
+            i=0
+            until curl -fsS http://127.0.0.1:4000/healthz >/dev/null 2>&1; do
+              i=$((i + 1))
+              if [ "$i" -ge 30 ]; then
+                echo "health check failed after 60s" >&2
+                docker compose -f compose.prod.yml logs --tail 50 web >&2
+                exit 1
+              fi
+              sleep 2
+            done
+
+            echo "deployed $TAG"

@@ -21,7 +21,6 @@ defmodule QaApp.Application do
         # Buffers votes in memory and flushes them in batches, so a click never
         # contends for SQLite's single write lock.
         QaApp.Engagement.VoteStore,
-        {DNSCluster, query: Application.get_env(:qa_app, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: QaApp.PubSub},
         # Tracks live visitors per room; used by capacity limits and counts.
         QaApp.Presence,

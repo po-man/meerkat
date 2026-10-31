@@ -39,4 +39,10 @@ npm-debug.log
 *.db
 *.db-*
 
+# Runtime data for the production stack
+/data/
+/backups/
+/deploy/env.prod
+/deploy/tunnel.env
+
 .env

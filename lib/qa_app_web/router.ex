@@ -39,6 +39,14 @@ defmodule QaAppWeb.Router do
     delete "/logout", SessionController, :delete
   end
 
+  # Liveness/readiness probe. Kept out of every pipeline on purpose: it must
+  # not touch sessions or auth, and it is excluded from force_ssl in prod.
+  scope "/", QaAppWeb do
+    pipe_through []
+
+    get "/healthz", HealthController, :show
+  end
+
   # Audience LiveView Routes
   live_session :audience, on_mount: [QaAppWeb.SessionLiveAuth] do
     scope "/", QaAppWeb do

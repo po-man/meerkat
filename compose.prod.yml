@@ -1,0 +1,49 @@
+# Production stack for a single always-on host. See docs/DEPLOY.md.
+#
+# One `web` replica on purpose: SQLite (single writer), Phoenix.Presence and the
+# in-process PubSub all assume a single node, so this stack must never be scaled.
+#
+# Traffic is inbound-free: `cloudflared` dials out to Cloudflare, so the host
+# needs no open HTTP(S) port and no TLS certificates.
+
+name: meerkat
+
+services:
+  web:
+    image: ${IMAGE_REPO:-ghcr.io/po-man/meerkat}:${IMAGE_TAG:-latest}
+    env_file:
+      - deploy/env.prod
+    restart: unless-stopped
+    stop_grace_period: 30s
+    volumes:
+      - ./data:/data
+    ports:
+      # Loopback only, for local debugging and health checks. The public
+      # entrypoint is the Cloudflare Tunnel, never this port.
+      - "127.0.0.1:4000:4000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    env_file:
+      - deploy/tunnel.env
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    depends_on:
+      web:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Meerkat backup and R2 upload
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target
