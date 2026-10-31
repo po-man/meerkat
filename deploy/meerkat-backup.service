@@ -1,0 +1,9 @@
+[Unit]
+Description=Meerkat: snapshot SQLite and upload to Cloudflare R2
+
+[Service]
+Type=oneshot
+ExecStart=/srv/meerkat/deploy/backup.sh
+# Keeps the host responsive while sqlite3 reads the database.
+Nice=10
+IOSchedulingClass=idle
