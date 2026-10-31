@@ -146,7 +146,7 @@ defmodule QaAppWeb.AudienceLive.Show do
     {:noreply,
      socket
      |> assign(:user_question, user_question)
-     |> questions_stream()}
+     |> update_question_stream(question)}
   end
 
   def handle_info({:room_settings_updated, room}, socket) do
@@ -165,18 +165,68 @@ defmodule QaAppWeb.AudienceLive.Show do
     do: user_question && user_question.id == question.id
 
   defp questions_stream(socket) do
-    socket.assigns.room.id
-    |> Engagement.list_active_questions()
-    |> Enum.with_index(1)
-    |> then(fn entries ->
+    entries =
+      socket.assigns.room.id
+      |> Engagement.list_active_questions()
+      |> Enum.with_index(1)
+
+    put_questions_stream(socket, entries)
+  end
+
+  defp put_questions_stream(socket, entries) do
+    socket
+    |> assign(:questions_count, length(entries))
+    |> assign(:question_entries, entries)
+    |> stream(:questions, entries, dom_id: &question_dom_id/1, reset: true)
+  end
+
+  defp question_dom_id({question, _index}), do: "q-" <> question.id
+
+  # Votes are broadcast to every connected visitor, so re-querying the whole
+  # feed here would mean one database query per viewer per vote. Instead, keep
+  # the in-memory feed sorted and only reset the stream when a vote changes the
+  # order; otherwise patch just the row that changed.
+  defp update_question_stream(socket, question) do
+    entries = socket.assigns.question_entries
+
+    if question.is_asked do
+      entries = Enum.reject(entries, fn {entry, _index} -> entry.id == question.id end)
+
       socket
       |> assign(:questions_count, length(entries))
-      |> stream(:questions, entries,
-        dom_id: fn {question, _index} -> "q-" <> question.id end,
-        reset: true
-      )
-    end)
+      |> assign(:question_entries, entries)
+      |> stream_delete(:questions, {question, nil})
+    else
+      remaining = Enum.reject(entries, fn {entry, _index} -> entry.id == question.id end)
+      new_entries = sort_question_entries(remaining ++ [{question, nil}])
+
+      if question_ids(entries) == question_ids(new_entries) do
+        {updated, index} =
+          Enum.find(new_entries, fn {entry, _index} -> entry.id == question.id end)
+
+        socket
+        |> assign(:question_entries, new_entries)
+        |> stream_insert(:questions, {updated, index})
+      else
+        put_questions_stream(socket, new_entries)
+      end
+    end
   end
+
+  # Mirrors the SQL order used by `Engagement.list_active_questions/1`: most
+  # votes first, then most recently submitted first. `Enum.sort_by/3` compares
+  # sort keys as terms, so timestamps are converted to integers.
+  defp sort_question_entries(entries) do
+    entries
+    |> Enum.map(fn {question, _index} -> question end)
+    |> Enum.sort_by(
+      fn question -> {question.vote_count, DateTime.to_unix(question.inserted_at)} end,
+      :desc
+    )
+    |> Enum.with_index(1)
+  end
+
+  defp question_ids(entries), do: Enum.map(entries, fn {question, _index} -> question.id end)
 
   def render(assigns) do
     ~H"""

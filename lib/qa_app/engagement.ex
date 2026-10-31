@@ -94,27 +94,42 @@ defmodule QaApp.Engagement do
   end
 
   def toggle_vote(room_id, question_id, session_id) do
-    question = Repo.get!(Question, question_id)
+    # SQLite only allows one writer at a time. Starting the transaction in
+    # `:immediate` mode takes the write lock before the read, so concurrent
+    # votes wait on `busy_timeout` instead of failing to upgrade a deferred
+    # read transaction with `Exqlite.Error: Database busy`. Reading the
+    # question inside the transaction also prevents lost vote increments.
+    result =
+      Repo.transaction(
+        fn ->
+          case Repo.get(Question, question_id) do
+            nil ->
+              Repo.rollback(:question_not_found)
 
-    cond do
-      question.room_id != room_id ->
-        # Never allow voting on a question from another room.
-        {:error, :invalid_room}
+            question ->
+              cond do
+                question.room_id != room_id ->
+                  # Never allow voting on a question from another room.
+                  Repo.rollback(:invalid_room)
 
-      question.session_id == session_id ->
-        {:error, :cannot_vote_own_question}
+                question.session_id == session_id ->
+                  Repo.rollback(:cannot_vote_own_question)
 
-      true ->
-        case Repo.transaction(fn ->
-               do_toggle_vote(question, question_id, session_id)
-             end) do
-          {:ok, {direction, updated_question}} ->
-            broadcast_question_updated(updated_question)
-            {:ok, {direction, updated_question}}
+                true ->
+                  do_toggle_vote(question, question_id, session_id)
+              end
+          end
+        end,
+        mode: :immediate
+      )
 
-          {:error, reason} ->
-            {:error, reason}
-        end
+    case result do
+      {:ok, {direction, updated_question}} ->
+        broadcast_question_updated(updated_question)
+        {:ok, {direction, updated_question}}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
