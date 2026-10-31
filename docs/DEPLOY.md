@@ -18,57 +18,46 @@ beyond one replica.**
 ## Prerequisites
 
 - A host: Oracle Cloud Always Free `VM.Standard.A1.Flex` (2 OCPU / 12 GB, Ubuntu
-  24.04 aarch64) is the intended target. `VM.Standard.E2.1.Micro` (amd64, 1 GB)
-  also works.
+  24.04 aarch64) is the intended target — see [ORACLE.md](ORACLE.md) for the
+  console walkthrough. `VM.Standard.E2.1.Micro` (amd64, 1 GB) also works if you
+  change the build platform.
 - A domain hosted on Cloudflare (free plan is enough).
-- Docker Engine + Compose plugin on the host.
-- `sqlite3` and `rclone` on the host (backups).
 - An R2 bucket (10 GB free) with an `rclone` remote named `r2`.
 
 ## One-time setup
 
-### 1. Host firewall
+### 1. Create the VM
 
-Oracle's VCN security list is the real firewall. Allow **only** SSH, ideally
-restricted to your IP:
+Follow [ORACLE.md](ORACLE.md): VCN, security list (SSH from your IP only, no
+80/443), the A1 instance, and the deploy key. Everything below happens over SSH
+on that host.
 
-| Direction | Port | Source |
-|-----------|------|--------|
-| Ingress | 22 | your IP |
-| Egress | all | — |
-
-Do not open 80/443/4000. The tunnel is outbound, so nothing else is reachable.
-
-### 2. Docker
+### 2. Clone and bootstrap
 
 ```bash
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 sqlite3 rclone
-sudo systemctl enable --now docker
-sudo usermod -aG docker "$USER"   # re-login afterwards
-```
-
-Make sure the Docker daemon starts at boot; `restart: unless-stopped` then brings
-the stack back after a reboot.
-
-### 3. Directory layout
-
-```bash
-sudo mkdir -p /srv/meerkat/{data,backups}
-sudo chown 65534:65534 /srv/meerkat/data      # the container runs as `nobody`
+sudo mkdir -p /srv && sudo chown ubuntu:ubuntu /srv
 git clone git@github.com:po-man/meerkat.git /srv/meerkat
 cd /srv/meerkat
+sudo bash deploy/bootstrap.sh
 ```
 
-`data/` holds the live SQLite database. It must be readable/writable by UID
-`65534` (`nobody`), which is the user inside the image.
+`bootstrap.sh` is idempotent and does the error-prone parts:
 
-### 4. Secrets
+- installs Docker Engine + Compose v2, `sqlite3`, `rclone`, `openssl`,
+- enables Docker at boot (so `restart: unless-stopped` survives a reboot),
+- creates `data/` owned by `65534` (`nobody`, the user inside the image) and
+  `backups/`,
+- generates `deploy/env.prod` from the sample with a random `SECRET_KEY_BASE`,
+- installs and enables the nightly backup timer,
+- prints a preflight report of anything still missing.
+
+Use `bash deploy/bootstrap.sh --check` any time to only re-run the report.
+
+### 3. Secrets
 
 ```bash
-cd /srv/meerkat
-install -m 600 deploy/env.prod.sample deploy/env.prod
-install -m 600 deploy/tunnel.env.sample deploy/tunnel.env
-openssl rand -base64 48     # paste into SECRET_KEY_BASE
+nano /srv/meerkat/deploy/env.prod      # PHX_HOST, ADMIN_ACCESS_CODE
+nano /srv/meerkat/deploy/tunnel.env    # CLOUDFLARE_TUNNEL_TOKEN
 ```
 
 `deploy/env.prod`:
@@ -81,12 +70,25 @@ openssl rand -base64 48     # paste into SECRET_KEY_BASE
 | `DATABASE_PATH` | Always `/data/prod.sqlite3` (the mounted volume). |
 | `PORT` / `POOL_SIZE` | Defaults `4000` / `5` are fine. |
 
+Both files must stay `600` and owned by the deploy user: the deploy step runs
+`docker compose` as that user, which reads them.
+
+### 4. Registry access
+
+The host pulls `ghcr.io/po-man/meerkat`. Either make the package public, or:
+
+```bash
+docker login ghcr.io -u <github-user> --password-stdin   # token with read:packages
+```
+
 ### 5. Cloudflare Tunnel
+
+Run this on your laptop (it needs a browser), not on the host:
 
 ```bash
 cloudflared tunnel login
 cloudflared tunnel create meerkat
-cloudflared tunnel token meerkat          # paste into deploy/tunnel.env
+cloudflared tunnel token meerkat          # paste into deploy/tunnel.env on the host
 cloudflared tunnel route dns meerkat ask.example.com
 ```
 
@@ -101,12 +103,11 @@ Then in the Cloudflare dashboard:
 
 ### 6. Backups
 
+`bootstrap.sh` already installed and enabled the timer; only the R2 credentials
+are missing:
+
 ```bash
-cd /srv/meerkat
-sudo ln -s /srv/meerkat/deploy/meerkat-backup.service /etc/systemd/system/
-sudo ln -s /srv/meerkat/deploy/meerkat-backup.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now meerkat-backup.timer
+rclone config            # create a remote named "r2" (S3-compatible, endpoint from the R2 dashboard)
 sudo systemctl start meerkat-backup.service      # prove it works now
 journalctl -u meerkat-backup.service -n 20
 ```
