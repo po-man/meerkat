@@ -1,5 +1,7 @@
 # Meerkat
 
+[![CI](https://github.com/po-man/meerkat/actions/workflows/ci.yml/badge.svg)](https://github.com/po-man/meerkat/actions/workflows/ci.yml)
+
 Meerkat is **a real-time, anonymous Q&A app for live events** like conferences, meetups, town halls.
 
 Audience members:
