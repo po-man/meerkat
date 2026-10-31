@@ -4,8 +4,12 @@ defmodule QaAppWeb.ModeratorLive.RoomAuth do
 
   Used by `QaAppWeb.ModeratorLive.Show` and `QaAppWeb.ModeratorLive.Settings`
   so both pages follow the same flow: load the room by slug, verify the
-  current user is an admin or the assigned moderator, subscribe to the room's
-  topic (once connected), and assign `:room`.
+  current user is an admin or the assigned moderator, and assign `:room`.
+
+  Subscription is intentionally left to each LiveView: the questions page needs
+  the feed and settings topics, while the settings page only needs settings and
+  presence. Subscribing both to the feed topic made every vote crash the
+  settings page.
 
   Returns `{:ok, socket}` when authorized or `{:redirect, socket}` with a
   flash message and a redirect otherwise.
@@ -28,7 +32,6 @@ defmodule QaAppWeb.ModeratorLive.RoomAuth do
         current_user = socket.assigns[:current_user]
 
         if current_user && (current_user.role == :admin || current_user.id == room.moderator_id) do
-          if connected?(socket), do: Events.subscribe_room(room.id)
           {:ok, assign(socket, :room, room)}
         else
           {:redirect,

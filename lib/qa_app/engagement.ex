@@ -6,6 +6,7 @@ defmodule QaApp.Engagement do
   import Ecto.Query, warn: false
   alias QaApp.Repo
   alias QaApp.Engagement.{Question, Vote}
+  alias QaApp.Events
   alias QaApp.Events.Room
 
   def list_active_questions(room_id) do
@@ -171,7 +172,7 @@ defmodule QaApp.Engagement do
   def broadcast_question_created(%Question{} = question) do
     Phoenix.PubSub.broadcast(
       QaApp.PubSub,
-      "room:#{question.room_id}",
+      Events.room_topic(question.room_id),
       {:question_created, question}
     )
   end
@@ -179,7 +180,7 @@ defmodule QaApp.Engagement do
   def broadcast_question_updated(%Question{} = question) do
     Phoenix.PubSub.broadcast(
       QaApp.PubSub,
-      "room:#{question.room_id}",
+      Events.room_topic(question.room_id),
       {:question_updated, question}
     )
   end

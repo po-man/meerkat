@@ -1,6 +1,8 @@
 defmodule QaAppWeb.ModeratorLive.Settings do
   use QaAppWeb, :live_view
 
+  require Logger
+
   alias QaApp.Events
   alias QaApp.RoomCapacity
   alias QaAppWeb.ModeratorLive.RoomAuth
@@ -8,6 +10,12 @@ defmodule QaAppWeb.ModeratorLive.Settings do
   def mount(params, _session, socket) do
     case RoomAuth.authorize(socket, params) do
       {:ok, socket} ->
+        if connected?(socket) do
+          room_id = socket.assigns.room.id
+          Events.subscribe_room_presence(room_id)
+          Events.subscribe_room_settings(room_id)
+        end
+
         {:ok,
          socket
          |> assign(:visitor_count, RoomCapacity.count(socket.assigns.room.id))
@@ -66,6 +74,17 @@ defmodule QaAppWeb.ModeratorLive.Settings do
   # Visitor presence changed (join/leave); refresh the live count.
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
     {:noreply, assign(socket, :visitor_count, RoomCapacity.count(socket.assigns.room.id))}
+  end
+
+  # Expulsions are broadcast on the presence topic. The settings page does not
+  # evict anyone itself, so it only needs to ignore them.
+  def handle_info({:room_visitors_expelled, _session_ids}, socket), do: {:noreply, socket}
+
+  # Defensive: a housekeeping page must never crash because a new broadcast
+  # was added to a topic it subscribes to.
+  def handle_info(message, socket) do
+    Logger.debug("Ignoring unexpected message on #{inspect(__MODULE__)}: #{inspect(message)}")
+    {:noreply, socket}
   end
 
   defp settings_form(room), do: Events.change_room(room) |> to_form()

@@ -30,6 +30,8 @@ defmodule QaAppWeb.AudienceLive.Show do
           :ok ->
             if connected?(socket) do
               Events.subscribe_room(room.id)
+              Events.subscribe_room_presence(room.id)
+              Events.subscribe_room_settings(room.id)
             end
 
             visitor_count = RoomCapacity.count(room.id)

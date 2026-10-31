@@ -107,19 +107,24 @@ defmodule QaApp.RoomCapacityTest do
   end
 
   describe "presence diffs" do
-    test "subscribers to the room topic receive presence_diff broadcasts", %{} do
+    test "subscribers to the presence topic receive presence_diff broadcasts", %{} do
       {:ok, room} = create_room("diff-room", 100)
 
       Phoenix.PubSub.subscribe(QaApp.PubSub, Presence.topic(room))
       track_visitor(room, "diffy", 1)
 
-      assert_receive %Phoenix.Socket.Broadcast{
-                       event: "presence_diff",
-                       topic: "room:" <> room_id
-                     },
-                     1000
+      assert_receive %Phoenix.Socket.Broadcast{event: "presence_diff", topic: topic}, 1000
 
-      assert room_id == room.id
+      assert topic == Presence.topic(room)
+    end
+
+    test "the question feed topic does not carry presence diffs", %{} do
+      {:ok, room} = create_room("feed-only-room", 100)
+
+      Phoenix.PubSub.subscribe(QaApp.PubSub, Events.room_topic(room))
+      track_visitor(room, "feed-only", 1)
+
+      refute_receive %Phoenix.Socket.Broadcast{event: "presence_diff"}, 200
     end
   end
 

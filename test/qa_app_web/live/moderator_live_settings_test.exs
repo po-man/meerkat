@@ -4,6 +4,7 @@ defmodule QaAppWeb.ModeratorLiveSettingsTest do
   import Phoenix.LiveViewTest
 
   alias QaApp.Accounts
+  alias QaApp.Engagement
   alias QaApp.Events
   alias QaAppWeb.AdminAuth
 
@@ -209,6 +210,25 @@ defmodule QaAppWeb.ModeratorLiveSettingsTest do
       assert_eventually(fn ->
         view |> element("#moderator-visitor-count") |> render() =~ "1"
       end)
+    end
+
+    test "keeps working while questions and votes are broadcast", %{
+      conn: conn,
+      owner: owner,
+      room: room
+    } do
+      conn = login_as(conn, owner.username)
+      {:ok, view, _html} = live(conn, "/moderator/r/#{room.slug}/settings")
+
+      # Question and vote broadcasts go to the feed topic; the settings page
+      # must never receive them (it used to crash on every one).
+      {:ok, question} =
+        Engagement.create_question(room, "question-author", %{"content" => "Live question"})
+
+      {:ok, _} = Engagement.toggle_vote(room.id, question.id, "voter-session")
+
+      assert render(view) =~ "Event Settings"
+      assert has_element?(view, "#settings-form")
     end
 
     test "redirects a moderator who does not own the room", %{conn: conn, room: room} do

@@ -9,6 +9,13 @@ defmodule QaAppWeb.ModeratorLive.Show do
   def mount(params, _session, socket) do
     case RoomAuth.authorize(socket, params) do
       {:ok, socket} ->
+        if connected?(socket) do
+          room_id = socket.assigns.room.id
+          Events.subscribe_room(room_id)
+          Events.subscribe_room_presence(room_id)
+          Events.subscribe_room_settings(room_id)
+        end
+
         {:ok,
          socket
          |> assign(:visitor_count, RoomCapacity.count(socket.assigns.room.id))

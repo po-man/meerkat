@@ -79,7 +79,7 @@ defmodule QaAppWeb.AudienceLiveTest do
 
       Phoenix.PubSub.broadcast(
         QaApp.PubSub,
-        "room:#{room.id}",
+        QaApp.Presence.topic(room.id),
         {:room_visitors_expelled, ["session-me"]}
       )
 
