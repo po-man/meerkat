@@ -9,9 +9,11 @@ import Config
 
 # This is skipped for :test so the test suite stays hermetic
 # (fresh checkouts / CI have no `.env`; tests set the variable explicitly).
+# Only :dev reads `.env`: in production, configuration must come from the
+# environment so a stray file can never silently supply (or override) secrets.
 env_file = Path.expand("../.env", __DIR__)
 
-if config_env() != :test and File.exists?(env_file) do
+if config_env() == :dev and File.exists?(env_file) do
   env_file
   |> File.read!()
   |> String.split("\n")
@@ -38,7 +40,8 @@ end
 if config_env() != :test and System.get_env("ADMIN_ACCESS_CODE") in [nil, ""] do
   raise """
   environment variable ADMIN_ACCESS_CODE is missing.
-  Set it in the `.env` file (see `.env.sample`) or export it before starting the server.
+  Set it in `.env` for development (see `.env.sample`) or in the process
+  environment for production (see docs/DEPLOY.md).
   """
 end
 
@@ -106,9 +109,32 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
-  host = System.get_env("PHX_HOST") || "example.com"
+  # The public host is used to build links and the moderator QR codes, so a
+  # wrong value is a visible production bug rather than a cosmetic default.
+  host =
+    case System.get_env("PHX_HOST") do
+      nil ->
+        raise """
+        environment variable PHX_HOST is missing.
+        Set it to the public hostname, for example: ask.example.com
+        """
 
-  config :qa_app, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+      "" ->
+        raise """
+        environment variable PHX_HOST is empty.
+        Set it to the public hostname, for example: ask.example.com
+        """
+
+      host ->
+        if String.contains?(host, "://") do
+          raise """
+          environment variable PHX_HOST must be a bare hostname, got: #{inspect(host)}.
+          Use ask.example.com instead of https://ask.example.com
+          """
+        end
+
+        host
+    end
 
   config :qa_app, QaAppWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
