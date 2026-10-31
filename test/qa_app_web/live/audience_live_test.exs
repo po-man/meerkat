@@ -293,6 +293,24 @@ defmodule QaAppWeb.AudienceLiveTest do
       assert view |> element("#user-question-vote-count") |> render() =~ "upvotes"
     end
 
+    test "updates the submitted question's vote count when others vote", %{
+      conn: conn,
+      room: room
+    } do
+      {:ok, question} =
+        Engagement.create_question(room, "session-me", %{"content" => "My question"})
+
+      {:ok, view, _html} = open_as(conn, room.slug, "session-me")
+
+      assert view |> element("#user-question-vote-count") |> render() =~ "0"
+
+      {:ok, _} = Engagement.toggle_vote(room.id, question.id, "other-voter")
+
+      assert_eventually(fn ->
+        view |> element("#user-question-vote-count") |> render() =~ "1"
+      end)
+    end
+
     test "updates the status to Asked when a moderator marks the question as asked", %{
       conn: conn,
       room: room

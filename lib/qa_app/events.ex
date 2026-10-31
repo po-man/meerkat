@@ -75,7 +75,15 @@ defmodule QaApp.Events do
   end
 
   def delete_room(%Room{} = room) do
-    Repo.delete(room)
+    case Repo.delete(room) do
+      {:ok, _deleted_room} = ok ->
+        # The room's votes are gone with it; drop any buffered tally.
+        QaApp.Engagement.VoteStore.forget(room.id)
+        ok
+
+      error ->
+        error
+    end
   end
 
   def change_room(%Room{} = room, attrs \\ %{}) do

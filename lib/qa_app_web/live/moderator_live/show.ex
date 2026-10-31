@@ -71,6 +71,11 @@ defmodule QaAppWeb.ModeratorLive.Show do
     {:noreply, load_questions(socket)}
   end
 
+  # Coalesced vote updates from the vote store.
+  def handle_info({:questions_updated, _questions}, socket) do
+    {:noreply, load_questions(socket)}
+  end
+
   def handle_info({:room_settings_updated, room}, socket) do
     {:noreply, assign(socket, :room, room)}
   end

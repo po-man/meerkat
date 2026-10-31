@@ -18,6 +18,9 @@ defmodule QaApp.Application do
         QaApp.Repo,
         {Ecto.Migrator,
          repos: Application.fetch_env!(:qa_app, :ecto_repos), skip: skip_migrations?()},
+        # Buffers votes in memory and flushes them in batches, so a click never
+        # contends for SQLite's single write lock.
+        QaApp.Engagement.VoteStore,
         {DNSCluster, query: Application.get_env(:qa_app, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: QaApp.PubSub},
         # Tracks live visitors per room; used by capacity limits and counts.

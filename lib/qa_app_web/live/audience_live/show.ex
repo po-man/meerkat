@@ -107,16 +107,21 @@ defmodule QaAppWeb.AudienceLive.Show do
     room = socket.assigns.room
 
     case Engagement.toggle_vote(room.id, question_id, session_id) do
-      {:ok, {direction, _question}} ->
-        # The vote broadcast pushes the new count/order to every viewer. Keep
-        # only this visitor's own selection in sync locally, so toggling a vote
-        # costs one write and zero follow-up reads.
+      {:ok, {direction, question}} ->
+        # The vote store buffers the vote in memory and broadcasts the new
+        # counts in batches, so this click costs no database round trip. Keep
+        # this visitor's own selection in sync locally.
+        #
+        # The button lives inside a streamed row, so the row must be re-streamed
+        # for the selection to render immediately; an assign change alone does
+        # not re-render stream children.
         {:noreply,
-         assign(
-           socket,
+         socket
+         |> assign(
            :user_voted_ids,
            put_user_vote(socket.assigns.user_voted_ids, question_id, direction)
-         )}
+         )
+         |> update_question_stream(question)}
 
       {:error, :cannot_vote_own_question} ->
         {:noreply, put_flash(socket, :error, "You cannot upvote your own question.")}
@@ -166,6 +171,10 @@ defmodule QaAppWeb.AudienceLive.Show do
      socket
      |> assign(:user_question, user_question)
      |> update_question_stream(question)}
+  end
+
+  def handle_info({:questions_updated, questions}, socket) do
+    {:noreply, apply_questions_updated(socket, questions)}
   end
 
   def handle_info({:room_settings_updated, room}, socket) do
@@ -230,6 +239,61 @@ defmodule QaAppWeb.AudienceLive.Show do
         put_questions_stream(socket, new_entries)
       end
     end
+  end
+
+  # A coalesced batch of vote changes from the vote store. Apply them all
+  # before touching the stream, so a burst of votes costs at most one re-sort
+  # and one stream reset per viewer.
+  defp apply_questions_updated(socket, questions) do
+    entries = socket.assigns.question_entries
+    by_id = Map.new(questions, &{&1.id, &1})
+
+    updated =
+      entries
+      |> Enum.map(fn {question, _index} -> {Map.get(by_id, question.id, question), nil} end)
+      |> Enum.reject(fn {question, _index} -> question.is_asked end)
+
+    present_ids = MapSet.new(updated, fn {question, _index} -> question.id end)
+
+    additions =
+      for {id, question} <- by_id,
+          not question.is_asked,
+          not MapSet.member?(present_ids, id),
+          do: {question, nil}
+
+    new_entries = sort_question_entries(updated ++ additions)
+
+    socket =
+      assign(
+        socket,
+        :user_question,
+        updated_user_question(socket.assigns.user_question, by_id)
+      )
+
+    if question_ids(entries) == question_ids(new_entries) do
+      changed_ids = MapSet.new(questions, & &1.id)
+
+      socket
+      |> assign(:questions_count, length(new_entries))
+      |> assign(:question_entries, new_entries)
+      |> then(fn socket ->
+        Enum.reduce(new_entries, socket, fn {question, _index} = entry, socket ->
+          if MapSet.member?(changed_ids, question.id) do
+            stream_insert(socket, :questions, entry)
+          else
+            socket
+          end
+        end)
+      end)
+    else
+      put_questions_stream(socket, new_entries)
+    end
+  end
+
+  defp updated_user_question(nil, _by_id), do: nil
+
+  defp updated_user_question(%{id: id} = question, by_id) do
+    Map.get(by_id, id, question)
   end
 
   # A newly created question has the lowest possible vote count and the newest

@@ -38,6 +38,11 @@ defmodule QaApp.DataCase do
   def setup_sandbox(tags) do
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(QaApp.Repo, shared: not tags[:async])
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    # Clear buffered votes before the sandbox owner goes away, so no flush timer
+    # can outlive the test's connection.
+    on_exit(fn -> QaApp.Engagement.VoteStore.reset!() end)
+    QaApp.Engagement.VoteStore.reset!()
+    :ok
   end
 
   @doc """

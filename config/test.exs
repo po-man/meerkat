@@ -28,6 +28,12 @@ config :qa_app, QaApp.Mailer, adapter: Swoosh.Adapters.Test
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false
 
+# Votes are buffered in memory by the vote store. Tests flush on demand instead
+# of relying on the wall-clock timer, which would race with the SQL sandbox.
+config :qa_app, QaApp.Engagement.VoteStore,
+  flush_interval: 60_000,
+  broadcast_interval: 10
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 
