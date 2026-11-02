@@ -49,9 +49,10 @@ Open [`localhost:4000`](http://localhost:4000). On first run, go to [`/login`](h
 
 ## Deploy
 
-Production runs as a single Docker image behind a Cloudflare Tunnel. See
-[`docs/DEPLOY.md`](docs/DEPLOY.md) for the host setup, release process, backups
-and rollback.
+Deployment is tag driven and runs on Gigalixir's free tier with Postgres; see
+[`docs/GIGALIXIR.md`](docs/GIGALIXIR.md) for the app setup, release process,
+verification and rollback.
 
-A separate free-tier demo runs on Gigalixir with Postgres; see
-[`docs/GIGALIXIR.md`](docs/GIGALIXIR.md).
+A production `Dockerfile` is included for self-hosting. It builds the SQLite
+variant (`QA_ECTO_ADAPTER=sqlite`) and expects `PHX_HOST`, `SECRET_KEY_BASE`,
+`ADMIN_ACCESS_CODE` and a volume mounted at `/data`.

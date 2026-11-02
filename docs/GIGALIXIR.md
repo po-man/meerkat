@@ -1,15 +1,13 @@
-# Deploying the demo to Gigalixir (free tier)
+# Deploying Meerkat to Gigalixir (free tier)
 
-This is a **second, parallel deployment** used as a demo/staging environment.
-The production stack described in [DEPLOY.md](DEPLOY.md) is unchanged: it keeps
-running on a single VM with SQLite behind Cloudflare Tunnel.
+This is the deployment. Tagging a commit on `main` ships it to the Gigalixir app;
+nothing else is deployed by CI.
 
 Gigalixir's free tier cannot run this app on SQLite because its disk is
-**ephemeral** — the database file is wiped on every restart and deploy. The
-Gigalixir build therefore uses Gigalixir's free Postgres database.
-
-Production builds default to Postgres. The Dockerfile explicitly sets
-`QA_ECTO_ADAPTER=sqlite` so the VM/Cloudflare stack keeps using SQLite.
+**ephemeral** — the database file is wiped on every restart and deploy. The build
+therefore uses Gigalixir's free Postgres database, which is also the default for
+production builds. The `Dockerfile` is the self-hosting alternative and is the
+only build that sets `QA_ECTO_ADAPTER=sqlite`.
 
 ```
 GitHub tag rel.gigalixir.*
@@ -32,8 +30,8 @@ GitHub Actions ── tests ──► git push gigalixir ──► buildpacks
 | Inactivity | Scaled to 0 after 30 days without a deploy | Tagging a release keeps it alive. |
 | WebSockets / TLS / custom domains | Supported | LiveView works. |
 
-This database is explicitly **not suitable for production**. Use the VM stack
-(or a Gigalixir Standard database) for real events.
+This database is explicitly **not suitable for production**. Self-host the
+`Dockerfile` (or use a Gigalixir Standard database) for real events.
 
 ## One-time setup
 
@@ -93,7 +91,7 @@ schema cannot be applied. Ecto's advisory lock makes concurrent boots safe.
 
 ## Deploying
 
-Deploys are tag driven and independent of the VM's `release.*` tags:
+Deploys are tag driven:
 
 ```bash
 git tag rel.gigalixir.2026.11.02.1
