@@ -83,9 +83,49 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.verify.outputs.deploy_ref }}
 
+      # Fail before pushing if the app is missing runtime config. GitHub
+      # secrets configure this workflow; they do not reach the running app.
+      - name: Check required app config
+        env:
+          GIGALIXIR_EMAIL: ${{ secrets.GIGALIXIR_EMAIL }}
+          GIGALIXIR_API_KEY: ${{ secrets.GIGALIXIR_API_KEY }}
+          GIGALIXIR_APP_NAME: ${{ secrets.GIGALIXIR_APP_NAME }}
+        run: |
+          set -eu
+          : "${GIGALIXIR_EMAIL:?missing GIGALIXIR_EMAIL secret}"
+          : "${GIGALIXIR_API_KEY:?missing GIGALIXIR_API_KEY secret}"
+          : "${GIGALIXIR_APP_NAME:?missing GIGALIXIR_APP_NAME secret}"
+
+          curl -fsSL https://get.gigalixir.com/cli | bash >/dev/null
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+
+          # The CLI logs in with the raw email; the push below uses the
+          # URI-encoded form. Accept either form in the secret.
+          RAW_EMAIL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.unquote(os.environ["GIGALIXIR_EMAIL"]))')
+          printf 'machine api.gigalixir.com\n  login %s\n  password %s\n' "$RAW_EMAIL" "$GIGALIXIR_API_KEY" > "$HOME/.netrc"
+          chmod 600 "$HOME/.netrc"
+
+          CONFIG=$(gigalixir config -a "$GIGALIXIR_APP_NAME")
+
+          missing=0
+          for key in ADMIN_ACCESS_CODE PHX_HOST DATABASE_URL; do
+            if ! jq -e --arg k "$key" 'has($k) and (.[$k] | length > 0)' <<< "$CONFIG" >/dev/null; then
+              echo "::error::Gigalixir app '$GIGALIXIR_APP_NAME' is missing $key. Run: gigalixir config:set $key=... -a $GIGALIXIR_APP_NAME"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+
+          POOL=$(jq -r '.POOL_SIZE // "2"' <<< "$CONFIG")
+          if [ "$POOL" -lt 2 ]; then
+            echo "::error::POOL_SIZE=$POOL. Ecto migrations need at least 2 connections. Run: gigalixir config:set POOL_SIZE=2 -a $GIGALIXIR_APP_NAME"
+            exit 1
+          fi
+
       # Deploys are a normal git push. The API key is the password and the
-      # email must be URI-encoded (e.g. you%40example.com). Migrations run at
-      # boot from rel/overlays/Procfile; the free tier has no SSH for ps:migrate.
+      # email must be URI-encoded in the URL. Migrations run at boot from
+      # rel/overlays/Procfile; the free tier has no SSH for ps:migrate.
       - name: Push to Gigalixir
         env:
           GIGALIXIR_EMAIL: ${{ secrets.GIGALIXIR_EMAIL }}
@@ -93,7 +133,13 @@ jobs:
           GIGALIXIR_APP_NAME: ${{ secrets.GIGALIXIR_APP_NAME }}
         run: |
           set -eu
-          git remote add gigalixir "https://${GIGALIXIR_EMAIL}:${GIGALIXIR_API_KEY}@git.gigalixir.com/${GIGALIXIR_APP_NAME}.git"
+          : "${GIGALIXIR_EMAIL:?missing GIGALIXIR_EMAIL secret}"
+          : "${GIGALIXIR_API_KEY:?missing GIGALIXIR_API_KEY secret}"
+          : "${GIGALIXIR_APP_NAME:?missing GIGALIXIR_APP_NAME secret}"
+
+          RAW_EMAIL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.unquote(os.environ["GIGALIXIR_EMAIL"]))')
+          ENCODED_EMAIL=$(printf '%s' "$RAW_EMAIL" | jq -sRr @uri)
+          git remote add gigalixir "https://${ENCODED_EMAIL}:${GIGALIXIR_API_KEY}@git.gigalixir.com/${GIGALIXIR_APP_NAME}.git"
           git push --force gigalixir HEAD:refs/heads/main
 
       - name: Wait for the app to become healthy
