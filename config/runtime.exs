@@ -40,8 +40,12 @@ end
 if config_env() != :test and System.get_env("ADMIN_ACCESS_CODE") in [nil, ""] do
   raise """
   environment variable ADMIN_ACCESS_CODE is missing.
-  Set it in `.env` for development (see `.env.sample`) or in the process
-  environment for production (see docs/DEPLOY.md).
+  Set it in `.env` for development (see `.env.sample`), in the process
+  environment for the Docker deployment (see docs/DEPLOY.md), or with
+
+      gigalixir config:set ADMIN_ACCESS_CODE=... -a <app>
+
+  for Gigalixir.
   """
 end
 
@@ -92,7 +96,25 @@ if config_env() == :prod do
           raise """
           environment variable DATABASE_URL is missing.
           For example: postgresql://user:pass@localhost:5432/qa_app
+
+          On Gigalixir, create the free database with:
+
+              gigalixir pg:create --free -a <app>
           """
+
+      # Ecto's migrator takes one connection for the advisory lock and another
+      # to run migrations, so a pool of 1 fails at boot. Gigalixir's free
+      # database allows exactly 2 connections.
+      if pool_size < 2 do
+        raise """
+        POOL_SIZE must be at least 2 when using Postgres.
+
+        Ecto's migrator uses one connection for the migration lock and one to
+        run migrations. On Gigalixir, set it with:
+
+            gigalixir config:set POOL_SIZE=2 -a <app>
+        """
+      end
 
       # Gigalixir requires SSL; DATABASE_SSL=false is only for local or CI
       # Postgres instances that do not terminate TLS.
@@ -142,13 +164,15 @@ if config_env() == :prod do
       nil ->
         raise """
         environment variable PHX_HOST is missing.
-        Set it to the public hostname, for example: ask.example.com
+        Set it to the bare public hostname, for example: meerkat.gigalixirapp.com
+        On Gigalixir: gigalixir config:set PHX_HOST=meerkat.gigalixirapp.com -a <app>
         """
 
       "" ->
         raise """
         environment variable PHX_HOST is empty.
-        Set it to the public hostname, for example: ask.example.com
+        Set it to the bare public hostname, for example: meerkat.gigalixirapp.com
+        On Gigalixir: gigalixir config:set PHX_HOST=meerkat.gigalixirapp.com -a <app>
         """
 
       host ->
