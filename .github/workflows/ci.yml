@@ -58,6 +58,64 @@ jobs:
       - name: Verify precommit changed nothing
         run: git diff --exit-code
 
+  # The test suite runs on SQLite. Gigalixir builds against Postgres, so this
+  # job compiles the production adapter and runs every migration against a real
+  # Postgres server, catching SQLite-only SQL before a release tag ships.
+  postgres-migrations:
+    name: postgres migrations
+    runs-on: ubuntu-24.04
+    env:
+      MIX_ENV: prod
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/qa_app_migrations
+      DATABASE_SSL: "false"
+      SECRET_KEY_BASE: ci-only-secret-key-base-that-is-long-enough-for-phoenix
+      PHX_HOST: localhost
+      ADMIN_ACCESS_CODE: ci-only-code
+      POOL_SIZE: "2"
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir and Erlang
+        uses: erlef/setup-beam@v1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Cache deps and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-${{ runner.arch }}-prod-postgres-${{ hashFiles('.tool-versions') }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-prod-postgres-${{ hashFiles('.tool-versions') }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile for production
+        run: mix compile --warnings-as-errors
+
+      - name: Create the database and run migrations twice
+        run: |
+          mix ecto.create
+          mix ecto.migrate
+          mix ecto.migrate
+
   docker:
     name: docker build
     runs-on: ubuntu-24.04
