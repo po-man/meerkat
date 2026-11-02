@@ -48,7 +48,6 @@ gigalixir create -n meerkat
 
 # Free Postgres; also sets DATABASE_URL and POOL_SIZE.
 gigalixir pg:create --free
-gigalixir ps:scale --replicas=1 --size=0.5
 
 # App runtime config. These are Gigalixir config vars, not GitHub secrets.
 gigalixir config:set \
@@ -72,9 +71,10 @@ Notes:
 - Use a long random `ADMIN_ACCESS_CODE` (`openssl rand -hex 16`) and create the
   first admin at `https://<app>.gigalixirapp.com/login` right away. Until an
   admin exists, that page is the setup form and the code is the only gate.
-- These variables live on the **app**, not in GitHub. GitHub secrets are only
-  used by the workflow. Adding `DATABASE_URL` or `ADMIN_ACCESS_CODE` to GitHub
-  does not configure the running app.
+- These variables live on the **app**, not in GitHub. The deploy workflow can
+  sync `ADMIN_ACCESS_CODE` from a GitHub secret and `PHX_HOST` from a repository
+  variable (defaulting to `<app>.gigalixirapp.com`). `DATABASE_URL` is not
+  synced; it stays on the app, set by `pg:create --free` or the console.
 - Free databases are **GCP-only** (`us-central1`/`europe-west1`). If the app was
   created on AWS, it reaches the database cross-cloud: functional, but with more
   latency than a same-region pair.
@@ -106,39 +106,55 @@ git push origin rel.gigalixir.2026.11.02.1
    must be an ancestor of `main`.
 2. **test** — reuses the normal CI workflow (SQLite suite + Postgres migration
    job).
-3. **deploy** — preflights the app's runtime config (`ADMIN_ACCESS_CODE`,
-   `PHX_HOST`, `DATABASE_URL`, and `POOL_SIZE >= 2`), then pushes the tag to
-   `git.gigalixir.com` as `main` and polls
-   `https://meerkat.gigalixirapp.com/healthz` for up to 10 minutes.
+3. **deploy** — syncs the runtime config from GitHub (`ADMIN_ACCESS_CODE` from
+   a secret, optional `PHX_HOST` from a variable, `POOL_SIZE=2`), verifies that
+   `ADMIN_ACCESS_CODE`, `PHX_HOST`, and `DATABASE_URL` exist and that
+   `POOL_SIZE >= 2`, pushes the tag to `git.gigalixir.com` as `main`, scales the
+   app to **one replica at size 0.5**, then polls
+   `https://meerkat.gigalixirapp.com/healthz` until the body is `ok` (up to
+   10 minutes).
 
-### GitHub secrets
+### GitHub secrets and variables
 
 | Secret | Value |
 |---|---|
 | `GIGALIXIR_APP_NAME` | `meerkat` |
 | `GIGALIXIR_EMAIL` | Your Gigalixir email. The workflow accepts raw or `%40`-encoded and normalizes it. |
 | `GIGALIXIR_API_KEY` | Key from `gigalixir login` (also in `~/.netrc`). |
+| `ADMIN_ACCESS_CODE` | Optional. If set, the workflow syncs it to the app on every deploy. |
 
-`DATABASE_URL`, `ADMIN_ACCESS_CODE`, and `PHX_HOST` are **not** GitHub secrets:
-they belong to the app and are managed with `gigalixir config:set` (or the web
-console). The optional `gigalixir` GitHub environment can hold these three
-workflow secrets and add a manual approval step.
+| Repository variable | Value |
+|---|---|
+| `PHX_HOST` | Optional. Bare hostname. Defaults to `<app>.gigalixirapp.com` when the app has no value yet. |
+
+`DATABASE_URL` is **not** a GitHub secret: it belongs to the app and is set by
+`gigalixir pg:create --free` or the console. If you set `ADMIN_ACCESS_CODE` in
+GitHub, treat it as the source of truth — a deploy overwrites the app value.
+
+The optional `gigalixir` GitHub environment can hold these secrets and add a
+manual approval step.
 
 ### Deploying by hand
 
 ```bash
 gigalixir git:remote meerkat   # adds the authenticated remote if missing
 git push gigalixir main
+# ps:scale fails until the first release exists, so run it after the push:
+gigalixir ps:scale --replicas=1 --size=0.5 -a meerkat
 gigalixir logs -a meerkat
 ```
 
 ## Verifying a deploy
 
 ```bash
-curl -fsS https://meerkat.gigalixirapp.com/healthz   # ok
-gigalixir ps                                         # 1 replica, healthy
+curl -fsS https://meerkat.gigalixirapp.com/healthz   # must print: ok
+gigalixir ps -a meerkat                              # 1 replica, healthy
 gigalixir logs -a meerkat
 ```
+
+An empty `200` from `/healthz` is Gigalixir's default ingress answering while
+the app has no running pods — it is **not** the app. The workflow therefore
+checks the body (`ok`), not just the status code.
 
 Then open the secret admin path, create an admin with `ADMIN_ACCESS_CODE`,
 create a room, and submit/vote from two browser tabs to confirm LiveView.
