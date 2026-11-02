@@ -15,6 +15,10 @@ Why a single node: SQLite has a single writer, `Phoenix.Presence` and PubSub are
 in-process, and `RoomExpiryScheduler` runs timers locally. **Never scale `web`
 beyond one replica.**
 
+> A separate demo/staging deployment runs on Gigalixir's free tier with
+> Postgres and is independent of this stack. It is shipped by tags named
+> `rel.gigalixir.*`; see [GIGALIXIR.md](GIGALIXIR.md).
+
 ## Prerequisites
 
 - A host: Google Cloud **Always Free e2-micro** (Ubuntu 24.04, `us-central1`) is

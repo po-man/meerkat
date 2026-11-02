@@ -1,0 +1,116 @@
+name: Release (Gigalixir)
+
+# Tag a commit on main to ship it to the free-tier Gigalixir app:
+#
+#   git tag rel.gigalixir.2026.11.02.1 && git push origin rel.gigalixir.2026.11.02.1
+#
+# The `rel.gigalixir.*` namespace is deliberately separate from the VM's
+# `release.*` tags so the two deployments ship independently.
+#
+# To roll back, run this workflow manually (workflow_dispatch) with a previous
+# `rel.gigalixir.*` tag. Gigalixir's app itself can also be rolled back with
+# `gigalixir releases:rollback`, which needs no rebuild.
+
+on:
+  push:
+    tags:
+      - "rel.gigalixir.*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Existing rel.gigalixir.* tag to deploy
+        required: true
+        type: string
+
+# Never run two Gigalixir deploys at once, and never cancel one midway.
+concurrency:
+  group: gigalixir
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      deploy_ref: ${{ steps.ref.outputs.deploy_ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Validate tag and origin
+        id: ref
+        env:
+          REQUESTED_REF: ${{ inputs.ref || github.ref_name }}
+        run: |
+          set -eu
+
+          if ! printf '%s' "$REQUESTED_REF" | grep -Eq '^rel\.gigalixir\.[0-9]{4}\.[0-9]{2}\.[0-9]{2}\.[A-Za-z0-9._-]+$'; then
+            echo "::error::'$REQUESTED_REF' does not match rel.gigalixir.YYYY.MM.DD.X"
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$(git rev-parse HEAD) is not an ancestor of main; tag releases from main"
+            exit 1
+          fi
+
+          echo "deploy_ref=$REQUESTED_REF" >> "$GITHUB_OUTPUT"
+          echo "### Deploying \`$REQUESTED_REF\` to Gigalixir" >> "$GITHUB_STEP_SUMMARY"
+
+  # Same job that runs on every PR: a tag can never ship untested code.
+  test:
+    name: test
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+    with:
+      build_docker: false
+
+  deploy:
+    name: deploy
+    needs: [verify, test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: gigalixir
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.verify.outputs.deploy_ref }}
+
+      # Deploys are a normal git push. The API key is the password and the
+      # email must be URI-encoded (e.g. you%40example.com). Migrations run at
+      # boot from rel/overlays/Procfile; the free tier has no SSH for ps:migrate.
+      - name: Push to Gigalixir
+        env:
+          GIGALIXIR_EMAIL: ${{ secrets.GIGALIXIR_EMAIL }}
+          GIGALIXIR_API_KEY: ${{ secrets.GIGALIXIR_API_KEY }}
+          GIGALIXIR_APP_NAME: ${{ secrets.GIGALIXIR_APP_NAME }}
+        run: |
+          set -eu
+          git remote add gigalixir "https://${GIGALIXIR_EMAIL}:${GIGALIXIR_API_KEY}@git.gigalixir.com/${GIGALIXIR_APP_NAME}.git"
+          git push --force gigalixir HEAD:refs/heads/main
+
+      - name: Wait for the app to become healthy
+        env:
+          GIGALIXIR_APP_NAME: ${{ secrets.GIGALIXIR_APP_NAME }}
+        run: |
+          set -eu
+          URL="https://${GIGALIXIR_APP_NAME}.gigalixirapp.com/healthz"
+
+          for i in $(seq 1 60); do
+            if curl -fsS "$URL" >/dev/null 2>&1; then
+              echo "healthy after ~$((i * 10))s"
+              echo "### Deployed: https://${GIGALIXIR_APP_NAME}.gigalixirapp.com" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "::error::app did not become healthy at $URL (see 'gigalixir logs -a $GIGALIXIR_APP_NAME')"
+          exit 1

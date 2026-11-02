@@ -384,7 +384,7 @@ defmodule QaApp.Engagement.VoteStore do
             )
           end)
         end,
-        mode: :immediate
+        transaction_opts()
       )
       |> case do
         {:ok, _result} -> :ok
@@ -393,6 +393,15 @@ defmodule QaApp.Engagement.VoteStore do
     rescue
       exception -> {:error, exception}
     end
+  end
+
+  # SQLite needs an immediate transaction so a batched write never tries to
+  # upgrade a deferred lock mid-transaction. Postgres does not understand the
+  # option, and its transactions start immediately anyway.
+  defp transaction_opts do
+    if Application.get_env(:qa_app, :ecto_adapter) == Ecto.Adapters.SQLite3,
+      do: [mode: :immediate],
+      else: []
   end
 
   # Broadcasts

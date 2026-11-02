@@ -52,3 +52,6 @@ Open [`localhost:4000`](http://localhost:4000). On first run, go to [`/login`](h
 Production runs as a single Docker image behind a Cloudflare Tunnel. See
 [`docs/DEPLOY.md`](docs/DEPLOY.md) for the host setup, release process, backups
 and rollback.
+
+A separate free-tier demo runs on Gigalixir with Postgres; see
+[`docs/GIGALIXIR.md`](docs/GIGALIXIR.md).

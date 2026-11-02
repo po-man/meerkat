@@ -81,21 +81,47 @@ if config_env() == :dev do
 end
 
 if config_env() == :prod do
-  database_path =
-    System.get_env("DATABASE_PATH") ||
-      raise """
-      environment variable DATABASE_PATH is missing.
-      For example: /etc/qa_app/qa_app.db
-      """
+  adapter = Application.get_env(:qa_app, :ecto_adapter, Ecto.Adapters.SQLite3)
+  default_pool_size = if adapter == Ecto.Adapters.Postgres, do: "2", else: "5"
+  pool_size = String.to_integer(System.get_env("POOL_SIZE") || default_pool_size)
 
-  config :qa_app, QaApp.Repo,
-    database: database_path,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "5"),
-    pragmas: [
-      journal_mode: :wal,
-      synchronous: :normal,
-      busy_timeout: 5000
-    ]
+  case adapter do
+    Ecto.Adapters.Postgres ->
+      database_url =
+        System.get_env("DATABASE_URL") ||
+          raise """
+          environment variable DATABASE_URL is missing.
+          For example: postgresql://user:pass@localhost:5432/qa_app
+          """
+
+      # Gigalixir requires SSL; DATABASE_SSL=false is only for local or CI
+      # Postgres instances that do not terminate TLS.
+      database_ssl = System.get_env("DATABASE_SSL", "true") in ["true", "1"]
+      socket_options = if System.get_env("ECTO_IPV6") in ["true", "1"], do: [:inet6], else: []
+
+      config :qa_app, QaApp.Repo,
+        url: database_url,
+        pool_size: pool_size,
+        ssl: database_ssl,
+        socket_options: socket_options
+
+    _ ->
+      database_path =
+        System.get_env("DATABASE_PATH") ||
+          raise """
+          environment variable DATABASE_PATH is missing.
+          For example: /etc/qa_app/qa_app.db
+          """
+
+      config :qa_app, QaApp.Repo,
+        database: database_path,
+        pool_size: pool_size,
+        pragmas: [
+          journal_mode: :wal,
+          synchronous: :normal,
+          busy_timeout: 5000
+        ]
+  end
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
