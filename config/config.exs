@@ -9,6 +9,9 @@ import Config
 
 config :qa_app,
   ecto_repos: [QaApp.Repo],
+  # Postgres is selected at build time for Gigalixir; SQLite stays the default
+  # for local development, tests and the Docker/Cloudflare deployment.
+  ecto_adapter: Ecto.Adapters.SQLite3,
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint

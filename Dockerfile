@@ -41,6 +41,10 @@ RUN mix local.hex --force \
 # set build ENV
 ENV MIX_ENV="prod"
 
+# This image is the SQLite/Cloudflare deployment; Gigalixir builds leave the
+# variable unset and therefore default to Postgres.
+ENV QA_ECTO_ADAPTER="sqlite"
+
 # install mix dependencies
 COPY mix.exs mix.lock ./
 RUN mix deps.get --only $MIX_ENV
