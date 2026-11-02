@@ -7,6 +7,9 @@ name: Release (Gigalixir)
 # The `rel.gigalixir.*` namespace is deliberately separate from the VM's
 # `release.*` tags so the two deployments ship independently.
 #
+# Secrets: GIGALIXIR_APP_NAME, GIGALIXIR_EMAIL, GIGALIXIR_API_KEY, and
+# optionally ADMIN_ACCESS_CODE (synced to the app). Optional variable: PHX_HOST.
+#
 # To roll back, run this workflow manually (workflow_dispatch) with a previous
 # `rel.gigalixir.*` tag. Gigalixir's app itself can also be rolled back with
 # `gigalixir releases:rollback`, which needs no rebuild.
@@ -83,18 +86,25 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.verify.outputs.deploy_ref }}
 
-      # Fail before pushing if the app is missing runtime config. GitHub
-      # secrets configure this workflow; they do not reach the running app.
-      - name: Check required app config
+      # Runtime config lives on the app; GitHub secrets do not reach it. Sync
+      # the values managed here, then fail before pushing if anything required
+      # is still missing.
+      - name: Sync and check app config
         env:
           GIGALIXIR_EMAIL: ${{ secrets.GIGALIXIR_EMAIL }}
           GIGALIXIR_API_KEY: ${{ secrets.GIGALIXIR_API_KEY }}
           GIGALIXIR_APP_NAME: ${{ secrets.GIGALIXIR_APP_NAME }}
+          ADMIN_ACCESS_CODE: ${{ secrets.ADMIN_ACCESS_CODE }}
+          PHX_HOST: ${{ vars.PHX_HOST }}
         run: |
           set -eu
-          : "${GIGALIXIR_EMAIL:?missing GIGALIXIR_EMAIL secret}"
-          : "${GIGALIXIR_API_KEY:?missing GIGALIXIR_API_KEY secret}"
-          : "${GIGALIXIR_APP_NAME:?missing GIGALIXIR_APP_NAME secret}"
+
+          APP=$(printf '%s' "$GIGALIXIR_APP_NAME" | tr -d '[:space:]')
+          EMAIL=$(printf '%s' "$GIGALIXIR_EMAIL" | tr -d '[:space:]')
+          API_KEY=$(printf '%s' "$GIGALIXIR_API_KEY" | tr -d '[:space:]')
+          : "${APP:?missing GIGALIXIR_APP_NAME secret}"
+          : "${EMAIL:?missing GIGALIXIR_EMAIL secret}"
+          : "${API_KEY:?missing GIGALIXIR_API_KEY secret}"
 
           curl -fsSL https://get.gigalixir.com/cli | bash >/dev/null
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
@@ -102,16 +112,61 @@ jobs:
 
           # The CLI logs in with the raw email; the push below uses the
           # URI-encoded form. Accept either form in the secret.
-          RAW_EMAIL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.unquote(os.environ["GIGALIXIR_EMAIL"]))')
-          printf 'machine api.gigalixir.com\n  login %s\n  password %s\n' "$RAW_EMAIL" "$GIGALIXIR_API_KEY" > "$HOME/.netrc"
+          RAW_EMAIL=$(EMAIL="$EMAIL" python3 -c 'import os, urllib.parse; print(urllib.parse.unquote(os.environ["EMAIL"]))')
+          printf 'machine api.gigalixir.com\n  login %s\n  password %s\n' "$RAW_EMAIL" "$API_KEY" > "$HOME/.netrc"
           chmod 600 "$HOME/.netrc"
 
-          CONFIG=$(gigalixir config -a "$GIGALIXIR_APP_NAME")
+          CONFIG=$(gigalixir config -a "$APP")
+          CURRENT_CODE=$(jq -r '.ADMIN_ACCESS_CODE // empty' <<< "$CONFIG")
+          CURRENT_HOST=$(jq -r '.PHX_HOST // empty' <<< "$CONFIG")
+          CURRENT_POOL=$(jq -r '.POOL_SIZE // "0"' <<< "$CONFIG")
+
+          # PHX_HOST: an explicit repository variable wins, otherwise keep an
+          # existing value, otherwise fall back to the default Gigalixir domain.
+          HOST="${PHX_HOST:-}"
+          if [ -n "$HOST" ]; then
+            HOST="${HOST#https://}"
+            HOST="${HOST#http://}"
+            HOST="${HOST%/}"
+          elif [ -z "$CURRENT_HOST" ]; then
+            HOST="${APP}.gigalixirapp.com"
+          fi
+
+          # Only set what actually differs, so deploys do not restart the app
+          # for no reason.
+          ASSIGNMENTS=()
+          if [ -n "${ADMIN_ACCESS_CODE:-}" ] && [ "$ADMIN_ACCESS_CODE" != "$CURRENT_CODE" ]; then
+            ASSIGNMENTS+=("ADMIN_ACCESS_CODE=$ADMIN_ACCESS_CODE")
+          fi
+          if [ -n "$HOST" ] && [ "$HOST" != "$CURRENT_HOST" ]; then
+            ASSIGNMENTS+=("PHX_HOST=$HOST")
+          fi
+          if [ "$CURRENT_POOL" -lt 2 ]; then
+            ASSIGNMENTS+=("POOL_SIZE=2")
+          fi
+
+          if [ ${#ASSIGNMENTS[@]} -gt 0 ]; then
+            gigalixir config:set "${ASSIGNMENTS[@]}" -a "$APP"
+            CONFIG=$(gigalixir config -a "$APP")
+          else
+            echo "app config already up to date"
+          fi
 
           missing=0
           for key in ADMIN_ACCESS_CODE PHX_HOST DATABASE_URL; do
             if ! jq -e --arg k "$key" 'has($k) and (.[$k] | length > 0)' <<< "$CONFIG" >/dev/null; then
-              echo "::error::Gigalixir app '$GIGALIXIR_APP_NAME' is missing $key. Run: gigalixir config:set $key=... -a $GIGALIXIR_APP_NAME"
+              case "$key" in
+                ADMIN_ACCESS_CODE)
+                  hint="add the ADMIN_ACCESS_CODE GitHub secret, or run: gigalixir config:set ADMIN_ACCESS_CODE=... -a $APP"
+                  ;;
+                PHX_HOST)
+                  hint="set the PHX_HOST repository variable, or run: gigalixir config:set PHX_HOST=$APP.gigalixirapp.com -a $APP"
+                  ;;
+                DATABASE_URL)
+                  hint="create the free database with: gigalixir pg:create --free -a $APP"
+                  ;;
+              esac
+              echo "::error::Gigalixir app '$APP' is missing $key. $hint"
               missing=1
             fi
           done
@@ -119,7 +174,7 @@ jobs:
 
           POOL=$(jq -r '.POOL_SIZE // "2"' <<< "$CONFIG")
           if [ "$POOL" -lt 2 ]; then
-            echo "::error::POOL_SIZE=$POOL. Ecto migrations need at least 2 connections. Run: gigalixir config:set POOL_SIZE=2 -a $GIGALIXIR_APP_NAME"
+            echo "::error::POOL_SIZE=$POOL. Ecto migrations need at least 2 connections. Run: gigalixir config:set POOL_SIZE=2 -a $APP"
             exit 1
           fi
 
@@ -133,30 +188,58 @@ jobs:
           GIGALIXIR_APP_NAME: ${{ secrets.GIGALIXIR_APP_NAME }}
         run: |
           set -eu
-          : "${GIGALIXIR_EMAIL:?missing GIGALIXIR_EMAIL secret}"
-          : "${GIGALIXIR_API_KEY:?missing GIGALIXIR_API_KEY secret}"
-          : "${GIGALIXIR_APP_NAME:?missing GIGALIXIR_APP_NAME secret}"
+          APP=$(printf '%s' "$GIGALIXIR_APP_NAME" | tr -d '[:space:]')
+          EMAIL=$(printf '%s' "$GIGALIXIR_EMAIL" | tr -d '[:space:]')
+          API_KEY=$(printf '%s' "$GIGALIXIR_API_KEY" | tr -d '[:space:]')
+          : "${APP:?missing GIGALIXIR_APP_NAME secret}"
+          : "${EMAIL:?missing GIGALIXIR_EMAIL secret}"
+          : "${API_KEY:?missing GIGALIXIR_API_KEY secret}"
 
-          RAW_EMAIL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.unquote(os.environ["GIGALIXIR_EMAIL"]))')
+          RAW_EMAIL=$(EMAIL="$EMAIL" python3 -c 'import os, urllib.parse; print(urllib.parse.unquote(os.environ["EMAIL"]))')
           ENCODED_EMAIL=$(printf '%s' "$RAW_EMAIL" | jq -sRr @uri)
-          git remote add gigalixir "https://${ENCODED_EMAIL}:${GIGALIXIR_API_KEY}@git.gigalixir.com/${GIGALIXIR_APP_NAME}.git"
+          git remote add gigalixir "https://${ENCODED_EMAIL}:${API_KEY}@git.gigalixir.com/${APP}.git"
           git push --force gigalixir HEAD:refs/heads/main
+
+      - name: Scale to one replica
+        env:
+          GIGALIXIR_APP_NAME: ${{ secrets.GIGALIXIR_APP_NAME }}
+        run: |
+          set -eu
+          APP=$(printf '%s' "$GIGALIXIR_APP_NAME" | tr -d '[:space:]')
+          : "${APP:?missing GIGALIXIR_APP_NAME secret}"
+
+          # A brand-new app has no release yet, so ps:scale fails until the
+          # first build finishes. Retry while the deploy is rolling out.
+          # One replica is required: PubSub, Presence and VoteStore are
+          # in-process. The free tier's largest replica is 0.5.
+          for i in $(seq 1 120); do
+            if gigalixir ps:scale --replicas=1 --size=0.5 -a "$APP"; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "::error::could not scale $APP; check 'gigalixir ps -a $APP'"
+          exit 1
 
       - name: Wait for the app to become healthy
         env:
           GIGALIXIR_APP_NAME: ${{ secrets.GIGALIXIR_APP_NAME }}
         run: |
           set -eu
-          URL="https://${GIGALIXIR_APP_NAME}.gigalixirapp.com/healthz"
+          APP=$(printf '%s' "$GIGALIXIR_APP_NAME" | tr -d '[:space:]')
+          URL="https://${APP}.gigalixirapp.com/healthz"
 
+          # Gigalixir's default ingress answers 200 with an empty body when the
+          # app has no running pods. Check the body, not just the status.
           for i in $(seq 1 60); do
-            if curl -fsS "$URL" >/dev/null 2>&1; then
+            if curl -fsS "$URL" 2>/dev/null | grep -qx 'ok'; then
               echo "healthy after ~$((i * 10))s"
-              echo "### Deployed: https://${GIGALIXIR_APP_NAME}.gigalixirapp.com" >> "$GITHUB_STEP_SUMMARY"
+              echo "### Deployed: https://${APP}.gigalixirapp.com" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             sleep 10
           done
 
-          echo "::error::app did not become healthy at $URL (see 'gigalixir logs -a $GIGALIXIR_APP_NAME')"
+          echo "::error::app did not become healthy at $URL (see 'gigalixir logs -a $APP')"
           exit 1
