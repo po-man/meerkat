@@ -50,20 +50,34 @@ gigalixir create -n meerkat
 gigalixir pg:create --free
 gigalixir ps:scale --replicas=1 --size=0.5
 
+# App runtime config. These are Gigalixir config vars, not GitHub secrets.
 gigalixir config:set \
-  POOL_SIZE=1 \
+  POOL_SIZE=2 \
   PHX_HOST=meerkat.gigalixirapp.com \
   ADMIN_ACCESS_CODE=<secret>
 ```
 
 Notes:
 
-- `POOL_SIZE=1` is deliberate. During a zero-downtime deploy Gigalixir runs the
-  old and new instance side by side, and the free database allows only **two**
-  connections in total.
+- **`POOL_SIZE=2` is required**, not 1. Ecto's migrator uses one connection for
+  the advisory lock and one to run migrations, so a pool of 1 crashes at boot
+  with `Migrations failed to run because the connection pool size is less than 2`.
+  The free database allows exactly 2 connections.
+- Keep **one replica**. A rolling deploy briefly runs two pods, so the 2-connection
+  budget is tight; the app's PubSub/Presence/VoteStore are in-process and cannot
+  span replicas either.
 - `SECRET_KEY_BASE`, `DATABASE_URL`, and `PORT` are injected by Gigalixir.
 - `DATABASE_SSL` defaults to `true`; it is only set to `false` for local/CI
   Postgres instances.
+- Use a long random `ADMIN_ACCESS_CODE` (`openssl rand -hex 16`) and create the
+  first admin at `https://<app>.gigalixirapp.com/login` right away. Until an
+  admin exists, that page is the setup form and the code is the only gate.
+- These variables live on the **app**, not in GitHub. GitHub secrets are only
+  used by the workflow. Adding `DATABASE_URL` or `ADMIN_ACCESS_CODE` to GitHub
+  does not configure the running app.
+- Free databases are **GCP-only** (`us-central1`/`europe-west1`). If the app was
+  created on AWS, it reaches the database cross-cloud: functional, but with more
+  latency than a same-region pair.
 
 ## Migrations
 
@@ -92,7 +106,9 @@ git push origin rel.gigalixir.2026.11.02.1
    must be an ancestor of `main`.
 2. **test** — reuses the normal CI workflow (SQLite suite + Postgres migration
    job).
-3. **deploy** — pushes the tag to `git.gigalixir.com` as `main`, then polls
+3. **deploy** — preflights the app's runtime config (`ADMIN_ACCESS_CODE`,
+   `PHX_HOST`, `DATABASE_URL`, and `POOL_SIZE >= 2`), then pushes the tag to
+   `git.gigalixir.com` as `main` and polls
    `https://meerkat.gigalixirapp.com/healthz` for up to 10 minutes.
 
 ### GitHub secrets
@@ -100,11 +116,13 @@ git push origin rel.gigalixir.2026.11.02.1
 | Secret | Value |
 |---|---|
 | `GIGALIXIR_APP_NAME` | `meerkat` |
-| `GIGALIXIR_EMAIL` | Your Gigalixir email, **URI-encoded** (`you%40example.com`). |
+| `GIGALIXIR_EMAIL` | Your Gigalixir email. The workflow accepts raw or `%40`-encoded and normalizes it. |
 | `GIGALIXIR_API_KEY` | Key from `gigalixir login` (also in `~/.netrc`). |
 
-The optional `gigalixir` GitHub environment can hold these secrets and add a
-manual approval step.
+`DATABASE_URL`, `ADMIN_ACCESS_CODE`, and `PHX_HOST` are **not** GitHub secrets:
+they belong to the app and are managed with `gigalixir config:set` (or the web
+console). The optional `gigalixir` GitHub environment can hold these three
+workflow secrets and add a manual approval step.
 
 ### Deploying by hand
 
@@ -152,8 +170,10 @@ backwards compatible with the previous release (expand/contract).
 - **10,000 rows** across the whole database. Expired rooms are deleted (and
   cascade their questions/votes), which keeps normal usage bounded, but a
   single very busy event can still hit the cap.
-- **2 database connections**, so the app runs with `POOL_SIZE=1` and serializes
-  database access. This is fine for a demo, not for a large live audience.
+- **2 database connections**, which is exactly what `POOL_SIZE=2` uses and what
+  Ecto's migrator needs. The app runs with no spare connection, and a rolling
+  deploy briefly overlaps two pods, so deploys during heavy traffic can run out
+  of connections. This is fine for a demo, not for a large live audience.
 - **No backups.** Losing the database loses the demo data.
 - **No SSH**, so no remote console or observer. Debug with `gigalixir logs`.
 - Idle database connections are dropped after 5 minutes; Postgrex reconnects on
