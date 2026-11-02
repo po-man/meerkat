@@ -39,10 +39,7 @@ npm-debug.log
 *.db
 *.db-*
 
-# Runtime data for the production stack
+# Runtime data for the self-hosted Docker image
 /data/
-/backups/
-/deploy/env.prod
-/deploy/tunnel.env
 
 .env

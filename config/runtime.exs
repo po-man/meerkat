@@ -41,7 +41,7 @@ if config_env() != :test and System.get_env("ADMIN_ACCESS_CODE") in [nil, ""] do
   raise """
   environment variable ADMIN_ACCESS_CODE is missing.
   Set it in `.env` for development (see `.env.sample`), in the process
-  environment for the Docker deployment (see docs/DEPLOY.md), or with
+  environment for the Docker image, or with
 
       gigalixir config:set ADMIN_ACCESS_CODE=... -a <app>
 
@@ -132,7 +132,7 @@ if config_env() == :prod do
         System.get_env("DATABASE_PATH") ||
           raise """
           environment variable DATABASE_PATH is missing.
-          For example: /etc/qa_app/qa_app.db
+          For example: /data/prod.sqlite3
           """
 
       config :qa_app, QaApp.Repo,
