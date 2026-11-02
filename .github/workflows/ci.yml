@@ -119,9 +119,10 @@ jobs:
   docker:
     name: docker build
     runs-on: ubuntu-24.04
-    # Releases build (and push) the image themselves, so they pass
-    # `build_docker: false`. For push/pull_request `inputs` is empty, and the
-    # comparison with `false` keeps the job enabled.
+    # The Gigalixir deploy reuses this workflow and passes `build_docker:
+    # false`, because buildpacks do the release build there. For
+    # push/pull_request `inputs` is empty, and the comparison with `false`
+    # keeps the job enabled.
     if: inputs.build_docker != false
     steps:
       - uses: actions/checkout@v4
@@ -132,8 +133,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          # Matches the deployment target (GCP e2-micro is x86_64).
-          # For an arm64 host (Oracle A1), use ubuntu-24.04-arm + linux/arm64.
+          # amd64 is the common self-hosting target. The image is not deployed
+          # by CI; this job only proves the Dockerfile still builds.
           platforms: linux/amd64
           push: false
           cache-from: type=gha,scope=meerkat

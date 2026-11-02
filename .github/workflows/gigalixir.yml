@@ -4,9 +4,6 @@ name: Release (Gigalixir)
 #
 #   git tag rel.gigalixir.2026.11.02.1 && git push origin rel.gigalixir.2026.11.02.1
 #
-# The `rel.gigalixir.*` namespace is deliberately separate from the VM's
-# `release.*` tags so the two deployments ship independently.
-#
 # Secrets: GIGALIXIR_APP_NAME, GIGALIXIR_EMAIL, GIGALIXIR_API_KEY, and
 # optionally ADMIN_ACCESS_CODE (synced to the app). Optional variable: PHX_HOST.
 #

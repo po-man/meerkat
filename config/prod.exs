@@ -1,8 +1,8 @@
 import Config
 
 # The adapter has to be chosen at compile time. Production defaults to
-# Postgres (Gigalixir); the Dockerfile sets QA_ECTO_ADAPTER=sqlite because the
-# VM/Cloudflare stack keeps using SQLite.
+# Postgres (Gigalixir); the Dockerfile sets QA_ECTO_ADAPTER=sqlite because it is
+# the self-hosting, SQLite-based image.
 #
 # The name is prefixed to avoid colliding with ECTO_ADAPTER, which ecto_sql
 # reads for its own test suite while dependencies compile.
