@@ -87,6 +87,7 @@ defmodule QaAppWeb do
       # Core UI components
       import QaAppWeb.CoreComponents
       # Shared presentational components
+      import QaAppWeb.Components.Meerkat
       import QaAppWeb.Components.Modal
       import QaAppWeb.Components.QuestionFeed
       # Date-time rendering helpers
