@@ -44,7 +44,7 @@ defmodule QaAppWeb.Layouts do
       <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
         <.link href={~p"/"} class="flex items-center gap-2.5 group">
           <span class="w-2.5 h-2.5 bg-accent transition-transform duration-150 group-hover:scale-90"></span>
-          <span class="text-[15px] font-semibold tracking-[-0.02em] text-ink">Live Q&amp;A</span>
+          <span class="text-[15px] font-semibold tracking-[-0.02em] text-ink">Meerkat</span>
         </.link>
 
         <div class="flex items-center gap-4">
