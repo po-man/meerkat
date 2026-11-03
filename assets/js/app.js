@@ -25,13 +25,13 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/qa_app"
 import topbar from "../vendor/topbar"
 import LocalDateTime from "./local_datetime"
-import {initMeerkat} from "./meerkat"
+import {initMeerkat, MeerkatHook} from "./meerkat"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, LocalDateTime},
+  hooks: {...colocatedHooks, LocalDateTime, Meerkat: MeerkatHook},
 })
 
 // Show progress bar on live navigation and form submits

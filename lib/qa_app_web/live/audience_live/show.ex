@@ -387,27 +387,43 @@ defmodule QaAppWeb.AudienceLive.Show do
         </header>
 
         <!-- Not Ready (inactive room) -->
-        <section :if={!@room.is_active} id="room-not-ready" class="mt-12 max-w-2xl">
-          <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-accent motion-safe:animate-pulse"></span>
-            Room Not Ready
-          </p>
+        <section
+          :if={!@room.is_active}
+          id="room-not-ready"
+          class="mt-12 max-w-2xl grid grid-cols-1 gap-y-10 md:grid-cols-[minmax(0,1fr)_auto] md:items-end md:gap-x-10"
+        >
+          <div>
+            <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
+              <span class="w-2 h-2 rounded-full bg-accent motion-safe:animate-pulse"></span>
+              Room Not Ready
+            </p>
 
-          <h2 class="mt-4 text-2xl sm:text-3xl font-semibold tracking-[-0.03em] leading-[1.08] text-ink">
-            This room isn't open yet
-          </h2>
+            <h2 class="mt-4 text-2xl sm:text-3xl font-semibold tracking-[-0.03em] leading-[1.08] text-ink">
+              This room isn't open yet
+            </h2>
 
-          <p class="mt-3 max-w-md text-[15px] leading-relaxed text-ink-2">
-            {@room.title} hasn't started yet. This page stays open and will bring
-            you in automatically as soon as the room is ready.
-          </p>
+            <p class="mt-3 max-w-md text-[15px] leading-relaxed text-ink-2">
+              {@room.title} hasn't started yet. This page stays open and will bring
+              you in automatically as soon as the room is ready.
+            </p>
 
-          <div class="mt-6 inline-flex items-center gap-2.5 rounded border border-line-strong px-4 py-3">
-            <span class="w-1.5 h-1.5 rounded-full bg-accent motion-safe:animate-pulse"></span>
-            <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums">
-              {@visitor_count} waiting
-            </span>
+            <div class="mt-6 inline-flex items-center gap-2.5 rounded border border-line-strong px-4 py-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-accent motion-safe:animate-pulse"></span>
+              <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2 tabular-nums">
+                {@visitor_count} waiting
+              </span>
+            </div>
           </div>
+
+          <%!-- The same mascot as the landing page, one size down, waiting with the
+               visitor. It needs the hook rather than the DOMContentLoaded boot:
+               this section is inserted by a patch when a room is closed while
+               somebody is already on the page. --%>
+          <.meerkat
+            id="room-not-ready-meerkat"
+            phx-hook="Meerkat"
+            class="w-[52vw] max-w-[12rem] justify-self-end md:w-[15rem] md:max-w-none md:justify-self-start"
+          />
         </section>
 
         <!-- Submission Form or Submitted Confirmation -->

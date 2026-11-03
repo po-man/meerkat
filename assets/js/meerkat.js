@@ -312,21 +312,51 @@ class Meerkat {
   }
 }
 
-export function initMeerkat() {
-  const roots = document.querySelectorAll("[data-meerkat]")
-  if (roots.length === 0) return []
-
-  const meerkats = Array.from(roots, root => new Meerkat(root))
-
+// Keeps one or more rigs in step with prefers-reduced-motion, including changes
+// made while the page is open. Returns a teardown so the LiveView path can drop
+// the listener with the element.
+const followMotionPreference = rigs => {
   const sync = () => {
-    for (const meerkat of meerkats) {
-      if (PREFERS_REDUCED_MOTION()) meerkat.stop()
-      else meerkat.start()
+    for (const rig of rigs) {
+      if (PREFERS_REDUCED_MOTION()) rig.stop()
+      else rig.start()
     }
   }
 
+  const media = window.matchMedia(REDUCED_MOTION)
+  media.addEventListener("change", sync)
   sync()
-  window.matchMedia(REDUCED_MOTION).addEventListener("change", sync)
+
+  return () => media.removeEventListener("change", sync)
+}
+
+// Boots the mascot on pages that are not LiveViews, where phx-hooks never mount.
+// LiveView-managed roots belong to the Meerkat hook below: a section inserted by
+// a patch is not in the DOM when this runs, so it would stay frozen forever.
+export function initMeerkat() {
+  const roots = [...document.querySelectorAll("[data-meerkat]")].filter(
+    root => !root.closest("[data-phx-main]")
+  )
+  if (roots.length === 0) return []
+
+  const meerkats = roots.map(root => new Meerkat(root))
+  followMotionPreference(meerkats) // lives as long as the page does
 
   return meerkats
+}
+
+// The LiveView path. Registered in app.js as `Meerkat`, so the markup reads
+// phx-hook="Meerkat". `destroyed` matters as much as `mounted`: the waiting
+// section is removed again when a room reopens, and without it the rig's timers
+// and listeners would outlive the element.
+export const MeerkatHook = {
+  mounted() {
+    this.rig = new Meerkat(this.el)
+    this.stopFollowing = followMotionPreference([this.rig])
+  },
+
+  destroyed() {
+    this.stopFollowing?.()
+    this.rig?.stop()
+  },
 }
