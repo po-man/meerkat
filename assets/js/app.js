@@ -25,12 +25,13 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/qa_app"
 import topbar from "../vendor/topbar"
 import LocalDateTime from "./local_datetime"
+import {initMeerkat, MeerkatHook} from "./meerkat"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, LocalDateTime},
+  hooks: {...colocatedHooks, LocalDateTime, Meerkat: MeerkatHook},
 })
 
 // Show progress bar on live navigation and form submits
@@ -70,6 +71,15 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!el.closest("[data-phx-main]")) dismissFlash(el)
   })
 })
+
+// Start the Meerkat key visual. It lives on the landing page, which is a plain
+// controller rather than a LiveView, so it is booted here instead of through a
+// phx-hook (hooks only mount inside a LiveView root).
+if (document.readyState === "loading") {
+  window.addEventListener("DOMContentLoaded", initMeerkat)
+} else {
+  initMeerkat()
+}
 
 // The lines below enable quality of life phoenix_live_reload
 // development features:

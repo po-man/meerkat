@@ -1,26 +1,33 @@
 <QaAppWeb.Layouts.app flash={@flash}>
-  <div class="max-w-6xl mx-auto px-6 pt-20 sm:pt-28 pb-24">
-    <div class="grid grid-cols-12 gap-x-6">
-      <div class="col-span-12 lg:col-span-8">
+  <div class="max-w-6xl mx-auto px-6 pt-20 sm:pt-24 pb-16">
+    <%!-- The text column is sized to the headline itself (`auto`) instead of a
+         fraction, so the mascot column gets everything that is left and the two
+         sit a single grid gap apart. See `.home-hero-title` in app.css. --%>
+    <div class="grid grid-cols-1 gap-y-12 md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-10 md:items-center">
+      <div>
         <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3 flex items-center gap-2.5">
           <span class="w-2 h-2 bg-accent"></span> Town halls · Conferences · Meetups
         </p>
 
-        <h1 class="mt-6 text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-[-0.04em] leading-[1.02] text-ink">
+        <h1 class="home-hero-title mt-6 font-semibold tracking-[-0.04em] leading-[1.02] text-ink">
           Real-Time Anonymous Q&amp;A<span class="text-accent">.</span>
         </h1>
-      </div>
 
-      <div class="col-span-12 lg:col-span-4 lg:col-start-9 mt-10 lg:mt-24 flex flex-col justify-end gap-6">
-        <p class="text-[15px] leading-relaxed text-ink-2">
+        <p class="mt-8 max-w-md text-[15px] leading-relaxed text-ink-2">
           Frictionless, live audience interaction for town halls, conferences, and meetups. Join an
           active room with the event code shared by its host.
         </p>
 
-        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+        <p class="mt-6 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
           One question per device
         </p>
       </div>
+
+      <%!-- The mascot owns a whole column, so no text can sit under it, and it is
+           centred against the text so its raised paw clears the headline. It is
+           capped so the hero still fits a short laptop screen, and left-aligned in
+           its column so the gap to the headline stays a single grid gap. --%>
+      <.meerkat class="w-[68vw] max-w-[17rem] justify-self-end md:w-full md:max-w-[30rem] md:justify-self-start" />
     </div>
   </div>
 </QaAppWeb.Layouts.app>

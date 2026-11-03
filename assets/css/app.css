@@ -210,3 +210,152 @@ textarea {
     transform: scaleX(0);
   }
 }
+
+/* ------------------------------------------------------------------
+   Landing hero headline
+   The size is fluid on purpose: the `em` measure below depends on it.
+   Capping the measure at 8em locks the line break after "Real-Time" at
+   every viewport ("Anonymous Q&A." is 7.72em and fits; "Real-Time
+   Anonymous" is 9.76em and cannot), which lets the hero size its text
+   column to the headline itself rather than to a grid fraction.
+   ------------------------------------------------------------------ */
+
+.home-hero-title {
+  font-size: clamp(2.25rem, 4.7vw + 0.75rem, 4.5rem);
+  max-width: 8em;
+}
+
+/* ------------------------------------------------------------------
+   Meerkat key visual
+   The mascot (QaAppWeb.Components.Meerkat) is an inline SVG painted from
+   its own ramp rather than the palette tokens, because it needs more
+   steps than paper/ink provide. The ramp flips with the theme so the
+   figure always sits dark-on-light in light mode and light-on-dark in
+   dark mode, while the parts that pop stay the same: body low contrast,
+   limbs and head high contrast.
+   CSS owns the ambient motion only; the discrete beats live in
+   assets/js/meerkat.js.
+   ------------------------------------------------------------------ */
+
+:root {
+  --mk-1: #c9c5b7; /* muzzle, belly */
+  --mk-2: #a8a294; /* body, forehead band */
+  --mk-3: #6a655c; /* head, flank, near limbs, tail */
+  --mk-4: #3a3731; /* far limbs, eye sockets, fur markings */
+  --mk-5: #1c1b18; /* pupils, mouth */
+  --mk-spark: #f6f5f1;
+  --mk-accent: #a65b3f; /* tail tip */
+  --mk-ear: #96604a; /* inner ear */
+  --mk-blush: #c9c5b7; /* cheek */
+}
+
+[data-theme="dark"] {
+  --mk-1: #c9c5b7;
+  --mk-2: #aca697;
+  --mk-3: #777167;
+  --mk-4: #4c473f;
+  --mk-5: #1c1b18;
+  --mk-spark: #f6f5f1;
+  --mk-accent: #b76547;
+  --mk-ear: #9f654e;
+  --mk-blush: #c9c5b7;
+}
+
+[data-meerkat] svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* The "stand tall" beat stretches the figure ~5% above its viewBox, so the
+     artwork has to be allowed to paint past the box instead of being sliced. */
+  overflow: visible;
+}
+
+/* Pivot points, in the SVG's own drawing space. Every animated part is
+   declared here next to the keyframes that use it. */
+[data-meerkat] [data-part] {
+  transform-box: view-box;
+}
+
+[data-part="meerkat"],
+[data-part="ambient"] {
+  transform-origin: 205px 407px;
+}
+
+[data-part="ambient"] {
+  animation: mk-breathe 4.2s ease-in-out infinite;
+}
+
+[data-part="tail"] {
+  transform-origin: 152px 320px;
+  animation: mk-tail 4.2s ease-in-out infinite;
+}
+
+/* Each foot pivots on its toe tip, which is the lowest, rightmost point of the
+   shape (both feet point right, matching the figure's facing). Clockwise around
+   that point lifts the heel off the ground: that is the tiptoe. */
+[data-part="foot-back"] {
+  transform-origin: 286.3px 408px;
+}
+
+[data-part="foot-front"] {
+  transform-origin: 215.8px 408px;
+}
+
+[data-part="arm-raised"] {
+  transform-origin: 249px 173px;
+}
+
+[data-part="head-unit"] {
+  transform-origin: 202px 124px;
+}
+
+[data-part="ear-left"] {
+  transform-origin: 128px 90px;
+}
+
+[data-part="ear-right"] {
+  transform-origin: 275px 77px;
+}
+
+[data-part="eye-left"] {
+  transform-origin: 185px 67px;
+}
+
+[data-part="eye-right"] {
+  transform-origin: 266px 56px;
+}
+
+/* Vertical only: a standing figure that rocks side to side reads as a shake. */
+@keyframes mk-breathe {
+  0%,
+  100% {
+    transform: translateY(0.7px);
+  }
+  50% {
+    transform: translateY(-1.8px);
+  }
+}
+
+@keyframes mk-tail {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+/* The scheduler pauses the ambient motion while the meerkat is off-screen,
+   off-tab, or reduced motion is requested. */
+[data-meerkat][data-meerkat-state="paused"] [data-part="ambient"],
+[data-meerkat][data-meerkat-state="paused"] [data-part="tail"] {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-part="ambient"],
+  [data-part="tail"] {
+    animation: none;
+  }
+}

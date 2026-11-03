@@ -127,6 +127,12 @@ defmodule QaAppWeb.AudienceLiveTest do
       refute has_element?(view, "#questions-feed")
       refute has_element?(view, "#question-form")
 
+      # The mascot waits with the visitor. It carries a phx-hook because this
+      # section can also arrive in a patch (see the test below).
+      assert has_element?(view, "#room-not-ready-meerkat")
+      assert has_element?(view, "#room-not-ready-meerkat [data-part='meerkat']")
+      assert view |> element("#room-not-ready-meerkat") |> render() =~ ~s(phx-hook="Meerkat")
+
       # The visitor is tracked as a live visitor even while waiting.
       html = view |> element("#visitor-count") |> render()
       assert html =~ "1"
@@ -175,6 +181,10 @@ defmodule QaAppWeb.AudienceLiveTest do
 
       assert_eventually(fn -> has_element?(view, "#room-not-ready") end)
       refute has_element?(view, "#questions-feed")
+
+      # The mascot arrives with the section, so it is mounted by the phx-hook
+      # rather than by the DOMContentLoaded boot that the landing page uses.
+      assert has_element?(view, "#room-not-ready-meerkat")
 
       # The waiting visitor keeps their connection and stays counted.
       assert QaApp.RoomCapacity.count(room.id) == 1
