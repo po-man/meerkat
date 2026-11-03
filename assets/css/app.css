@@ -212,6 +212,20 @@ textarea {
 }
 
 /* ------------------------------------------------------------------
+   Landing hero headline
+   The size is fluid on purpose: the `em` measure below depends on it.
+   Capping the measure at 8em locks the line break after "Real-Time" at
+   every viewport ("Anonymous Q&A." is 7.72em and fits; "Real-Time
+   Anonymous" is 9.76em and cannot), which lets the hero size its text
+   column to the headline itself rather than to a grid fraction.
+   ------------------------------------------------------------------ */
+
+.home-hero-title {
+  font-size: clamp(2.25rem, 4.7vw + 0.75rem, 4.5rem);
+  max-width: 8em;
+}
+
+/* ------------------------------------------------------------------
    Meerkat key visual
    The mascot (QaAppWeb.Components.Meerkat) is an inline SVG painted from
    its own ramp rather than the palette tokens, because it needs more
