@@ -290,6 +290,17 @@ textarea {
   animation: mk-tail 4.2s ease-in-out infinite;
 }
 
+/* Each foot pivots on its toe tip, which is the lowest, rightmost point of the
+   shape (both feet point right, matching the figure's facing). Clockwise around
+   that point lifts the heel off the ground: that is the tiptoe. */
+[data-part="foot-back"] {
+  transform-origin: 286.3px 408px;
+}
+
+[data-part="foot-front"] {
+  transform-origin: 215.8px 408px;
+}
+
 [data-part="arm-raised"] {
   transform-origin: 249px 173px;
 }

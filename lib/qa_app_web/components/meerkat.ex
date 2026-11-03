@@ -13,11 +13,16 @@ defmodule QaAppWeb.Components.Meerkat do
       body, tail sway) and the pivot points, so the meerkat is alive from the
       first paint and keeps working if JavaScript never runs.
     * `assets/js/meerkat.js` owns the discrete beats (blink, eye-roll, the
-      paw raise it keeps insisting on, and the "reach higher" stretch).
+      paw raise it keeps insisting on, and the "reach higher" stretch, which
+      carries it up onto its toes).
+
+  The feet are a sibling group rather than part of the legs, because a tiptoe
+  rotates them on their toes while the body rises. They deliberately sit
+  outside both wrappers so they stay planted.
 
   Whole-body motion is deliberately vertical only. The figure is a standing
   animal, so any rotation of the body reads as an unnatural shake; the body
-  breathes and reaches, and only the tail, head and arm rotate.
+  breathes and reaches, and only the tail, head, arm and feet rotate.
 
   The `viewBox` keeps its origin at `0 0` and only trims the empty space below
   the feet, so the pivot coordinates in the stylesheet address the artwork
@@ -106,6 +111,26 @@ defmodule QaAppWeb.Components.Meerkat do
           </clipPath>
         </defs>
 
+        <%!-- The feet sit outside both body groups on purpose: a tiptoe pivots them
+             on their toes while the body rises, so they must not inherit that rise.
+             Drawing them before the legs is invisible, because each foot shares the
+             fill of the leg it belongs to and the two already overlap by ~11 units. --%>
+        <g data-part="feet">
+          <g data-part="foot-back">
+            <path
+              d="M286 402C286.264 408.069 272.449 407 254.5 407C221 407 221 405.5 221 395C221 383.5 224 385 254.5 385C279 385 285.5 390.5 286 402Z"
+              fill="var(--mk-4)"
+            />
+          </g>
+
+          <g data-part="foot-front">
+            <path
+              d="M215.5 402C215.764 408.069 201.949 407 184 407C150.5 407 150.5 405.5 150.5 395C150.5 383.5 153.5 385 184 385C208.5 385 215 390.5 215.5 402Z"
+              fill="var(--mk-3)"
+            />
+          </g>
+        </g>
+
         <g id="meerkat" data-part="meerkat">
           <%!-- JS owns this wrapper: whole-body beats (the reach). --%>
           <g data-part="ambient">
@@ -114,19 +139,11 @@ defmodule QaAppWeb.Components.Meerkat do
                 d="M293 326.5C290.001 360 260.501 396 239.001 396C221.5 396 220 389.5 218.5 330.5C218.5 297.639 222.371 267 247.5 267C272.629 267 293 293.639 293 326.5Z"
                 fill="var(--mk-4)"
               />
-              <path
-                d="M286 402C286.264 408.069 272.449 407 254.5 407C221 407 221 405.5 221 395C221 383.5 224 385 254.5 385C279 385 285.5 390.5 286 402Z"
-                fill="var(--mk-4)"
-              />
             </g>
 
             <g data-part="leg-front">
               <path
                 d="M222.5 326.5C219.5 360 189.972 394.899 168.5 396C149 397 153.5 384.5 151.5 371.5C146.28 358.488 141.452 358.429 131.5 343.5C120.5 327 128.371 266.5 153.5 266.5C200.499 266.5 222.5 293.639 222.5 326.5Z"
-                fill="var(--mk-3)"
-              />
-              <path
-                d="M215.5 402C215.764 408.069 201.949 407 184 407C150.5 407 150.5 405.5 150.5 395C150.5 383.5 153.5 385 184 385C208.5 385 215 390.5 215.5 402Z"
                 fill="var(--mk-3)"
               />
             </g>

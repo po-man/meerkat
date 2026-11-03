@@ -18,9 +18,10 @@ defmodule QaAppWeb.PageControllerTest do
 
     # Every layer the animation layer targets must exist exactly once: the CSS
     # ambient motion and the JS beats both address these hooks by name.
-    for part <- ~w(ambient leg-back leg-front tail arm-raised torso-front torso-back arm-near
-                   head-unit ears ear-left ear-right face eyes eye-left eye-right pupil-left
-                   pupil-right) do
+    for part <-
+          ~w(feet foot-back foot-front ambient leg-back leg-front tail arm-raised torso-front
+                   torso-back arm-near head-unit ears ear-left ear-right face eyes eye-left
+                   eye-right pupil-left pupil-right) do
       assert document |> LazyHTML.query(~s([data-part="#{part}"])) |> Enum.count() == 1,
              "expected exactly one #{part} group in the meerkat"
     end

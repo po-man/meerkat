@@ -9,16 +9,18 @@
 //   blink  - the eye groups squash, occasionally twice
 //   roll   - the pupils arc inside their sockets, sometimes with a head tilt
 //   ask    - the raised paw pumps
-//   reach  - it stretches taller, perches its ears and sometimes scans
+//   reach  - it stretches taller, rises onto its toes, perches its ears and
+//            sometimes scans
 //
 // The mascot is deliberately eager: the paw raise is the point of the pose, so
 // it is the most frequent beat, and the reach follows close behind. Beats are
 // scheduled on randomized timers and gated by viewport visibility and tab focus.
 // Everything animates transform only, so every beat stays on the compositor.
 //
-// Only the tail, head and arm rotate. Rotating the body of a standing animal
-// reads as a shake, so whole-body motion stays vertical: it breathes and it
-// stretches, nothing else.
+// Only the tail, head, arm and feet rotate. Rotating the body of a standing
+// animal reads as a shake, so whole-body motion stays vertical: it breathes and
+// it rises. The feet pivot on their toes, which is what makes the rise read as
+// a tiptoe rather than as a rubber stretch.
 //
 // The SVG is not on a LiveView root (the landing page is a static controller)
 // so this is a plain module, not a phx-hook.
@@ -68,12 +70,34 @@ const PERK = [
   {transform: "scaleY(1)"},
 ]
 
+// The body's own rise is deliberately small, because it is what opens the joint:
+// where the leg's lower edge crosses the foot's top edge (~x=191 front, the heel
+// of the back foot), the leg rising faster than that edge leaves a notch. A sweep
+// of the two parameters measured the worst gap at each combination, and 4 units
+// here with 10 degrees in TIPTOE keeps it under 2 units (~2px) while the heel
+// still lifts ~19px on screen. The trunk stretch supplies the rest of the height,
+// so the reach loses nothing.
 const ALERT_BODY = [
   {transform: "translateY(0) scaleX(1) scaleY(1)"},
-  {transform: "translateY(-4.5px) scaleX(0.985) scaleY(1.055)", offset: 0.28},
-  {transform: "translateY(-3.4px) scaleX(0.989) scaleY(1.045)", offset: 0.55},
+  {transform: "translateY(-3px) scaleX(0.995) scaleY(1.03)", offset: 0.22},
+  {transform: "translateY(-4px) scaleX(0.99) scaleY(1.035)", offset: 0.42},
+  {transform: "translateY(-4px) scaleX(0.99) scaleY(1.035)", offset: 0.62},
   {transform: "translateY(0) scaleX(1) scaleY(1)"},
 ]
+
+// The heels come off the ground. They reach full lift *before* the body reaches
+// full height, which is the safe order as well as the physical one: while the
+// foot is still flat its silhouette only covers a body rise of ~11 units, and
+// rotating it first raises that allowance to ~18. The back foot trails the front
+// slightly (see BACK_FOOT_LAG_MS) so the pair does not move as one rigid piece.
+const TIPTOE = [
+  {transform: "rotate(0deg)"},
+  {transform: "rotate(10deg)", offset: 0.26},
+  {transform: "rotate(10deg)", offset: 0.62},
+  {transform: "rotate(0deg)"},
+]
+
+const BACK_FOOT_LAG_MS = 40
 
 // A single sweep, not a wiggle. It fires on roughly half the reaches, so a
 // more frequent reach does not turn the head into a metronome.
@@ -95,6 +119,8 @@ class Meerkat {
     const part = name => root.querySelector(`[data-part="${name}"]`)
     this.body = part("meerkat")
     this.arm = part("arm-raised")
+    this.footBack = part("foot-back")
+    this.footFront = part("foot-front")
     this.head = part("head-unit")
     this.earLeft = part("ear-left")
     this.earRight = part("ear-right")
@@ -157,8 +183,8 @@ class Meerkat {
 
   // The signature beat. Only the arm moves: the body used to bob along with it,
   // which read as a shiver rather than as eagerness.
-  pump() {
-    this.play(this.arm, ASK, {duration: 1050, easing: EASE})
+  pump(duration = 1050) {
+    this.play(this.arm, ASK, {duration, easing: EASE})
   }
 
   // Skipped rather than restarted while one is in flight, so the rhythm stays
@@ -169,16 +195,36 @@ class Meerkat {
     this.pump()
   }
 
+  // Up onto the toes. The heels lift; the back foot trails the front by a frame
+  // or two so the pair does not move as one rigid piece. The body's rise is small
+  // on purpose (see ALERT_BODY) so the legs never outrun the feet's silhouette.
+  tipToe(duration) {
+    const options = {duration, easing: EASE}
+    this.play(this.footFront, TIPTOE, options)
+    this.play(this.footBack, TIPTOE, {...options, delay: BACK_FOOT_LAG_MS})
+  }
+
+  // The whole "look at me" gesture: rise, then the feet follow.
+  reach(duration) {
+    this.play(this.body, ALERT_BODY, {duration, easing: EASE})
+    this.tipToe(duration)
+  }
+
+  // Hovering or tapping is the reader answering the mascot, so it goes all the
+  // way up onto its toes and waves back, on a shorter beat than the idle reach.
   wave() {
-    // An answer to the pointer always lands, even mid-pump.
-    if (this.running) this.pump()
+    if (!this.running) return
+
+    const duration = 900
+    this.reach(duration)
+    this.pump(duration)
   }
 
   alert() {
     const duration = 1500
     const perk = {duration: 650, easing: "ease-out"}
 
-    this.play(this.body, ALERT_BODY, {duration, easing: EASE})
+    this.reach(duration)
     this.play(this.earLeft, PERK, perk)
     this.play(this.earRight, PERK, perk)
 
