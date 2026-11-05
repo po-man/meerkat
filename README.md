@@ -4,6 +4,10 @@
 
 Meerkat is **a real-time, anonymous Q&A app for live events** like conferences, meetups, town halls.
 
+https://github.com/user-attachments/assets/f109cf0a-ebf4-4c55-a744-b4c54ba547d7
+
+_A quick tour — the audience joins by QR, the room fills up live, and questions and upvotes land on the moderator's dashboard in real time._
+
 Audience members:
 - join a room with a short link,
 - submit questions without signing up, and
